@@ -1,13 +1,15 @@
 'use strict';
 /* Misión: Obtener la Barra I — versión PWA (sin servidor). Datos solo en este dispositivo. */
-const VER = '2.0';
+const VER = '2.1';
 const SECRET = 'REMOVED-OLD-SECRET';
 const ORIGEN = { admin: 'REDACTED', planta: 'REDACTED', cadete: 'REDACTED' };
 const METAS = { 1: 42, 2: 48, 3: 54, 4: 60 };
-const TEMAS = { tie: 'Tiempos verbales', est: 'Estructura', voc: 'Vocabulario', lec: 'Lectura', lir: 'Listening: respuestas', lic: 'Listening: comprensión', lin: 'Listening: datos' };
+const TEMAS = { tie: 'Tiempos verbales', est: 'Estructura', voc: 'Vocabulario', lec: 'Lectura', lir: 'Listening: respuestas', lic: 'Listening: comprensión', lin: 'Listening: datos', lrc: 'Listening: oraciones' };
 const FORMAS = 'ABCDEFGHIJKLMNOP'.split('');
 const DUR_Q = { 70: 100, 60: 86, 45: 64, 30: 42 };
 const KEY = 'mb1_estado_v2';
+const PISTA = { tie: 'Fíjate en las palabras de tiempo (yesterday, since, every day, already, by next…): ellas deciden el tiempo verbal.', est: 'Revisa la estructura: preposición, artículo, comparativo o conector que exige la oración.', voc: 'Busca el sinónimo o el significado en contexto; descarta las opciones que cambian el sentido.', lec: 'La respuesta está en el texto: vuelve a leer la oración que contiene la palabra clave de la pregunta.', lir: 'Responde a lo que se pregunta: Where → lugar, When → tiempo, Who → persona, How long → duración.', lic: 'Escucha la idea completa, no palabras sueltas: negaciones y "but" cambian el sentido.', lin: 'Anota mentalmente el dato (hora, número, día o lugar) y fíjate si después lo cambian.', lrc: 'Escucha la terminación del verbo (-ed, -s, -ing) y las palabras pequeñas.' };
+const PILOTO = { m: 'PILOTO-EME', nombre: 'Usuario Piloto', code: 'REMOVED-OLD-CODE' };
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function hash(str, seed = 0) { let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed; for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909); return 4294967296 * (2097151 & h2) + (h1 >>> 0); }
@@ -24,7 +26,8 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.ad
 function b64e(s) { return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function b64d(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return decodeURIComponent(escape(atob(s))); }
 
-const BANCO = []; (() => { let pas = null, n = 0; for (const ln of window.BANCO_RAW.split('\n')) { const p = ln.split('|'); if (p.length < 2) continue; if (p[0] === 'P') { pas = p[1]; continue; } const [t, au, q, ...o] = p; BANCO.push({ id: t + (++n), t, au: au || '', q: q || '', o, pas: t === 'lec' ? pas : null, lis: t[0] === 'l' && t !== 'lec' }); } })();
+const BANCO = []; (() => { let pas = null, n = 0; for (const ln of window.BANCO_RAW.split('\n')) { const p = ln.split('|'); if (p.length < 2) continue; if (p[0] === 'P') { pas = p[1]; continue; } const [t, au, q, ...o] = p; BANCO.push({ id: t + (++n), t, au: au || '', q: q || '', o, pas: t === 'lec' ? pas : null, lis: t[0] === 'l' && t !== 'lec' }); }
+  BANCO.filter(b => (b.t === 'tie' || b.t === 'est') && b.q.includes('___')).forEach(b => BANCO.push({ id: 'lrc' + b.id, t: 'lrc', lis: true, au: b.q.replace('___', b.o[0]), q: '', o: b.o.map(x => b.q.replace('___', x)) })); })();
 const DIAS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const LUG = ['the clinic', 'room twelve', 'the main gate', 'the motor pool', 'the library', 'the dining hall', 'building C', 'the parade ground'];
 function genLis(seed) {
@@ -49,6 +52,14 @@ function load() { try { return Object.assign(base(), JSON.parse(localStorage.get
 function base() { return { codes: { ...ORIGEN }, sesion: null, perfiles: {}, resultados: [], pases: [], avances: {}, padron: [], registro: [], pase: null, tema: 'claro' }; }
 function save() { localStorage.setItem(KEY, JSON.stringify(S)); }
 const P = () => S.sesion && S.perfiles[S.sesion.m];
+const esPiloto = () => S.sesion && S.sesion.m === PILOTO.m;
+const xp = p => (p.xpBase || 0) + p.ans.reduce((s, a) => s + (a[1] ? 10 : 2), 0);
+function crearPiloto() { const p = nuevoPerfil({ m: PILOTO.m, nombre: PILOTO.nombre, perfil: 'cadete', anio: 4, gp: 'A', gi: '1', cia: '1/a.', piloto: true }); const now = Date.now(), r = rng('piloto');
+  const ids = BANCO.filter(b => b.t !== 'lrc').map(b => b.id); const hist = {}; const curva = [44, 45, 45, 47, 48, 48, 50, 50, 51];
+  for (let d = 8; d >= 0; d--) { const k = hoy(new Date(now - d * 864e5)); p.dias[k] = { q: 17, min: 12 }; hist[k] = curva[8 - d]; }
+  for (let i = 0; i < 150; i++) { const it = byId(ids[Math.floor(r() * ids.length)]); const ok = i < 77; const t = p.tema[it.t] || (p.tema[it.t] = [0, 0]); t[0]++; if (ok) t[1]++; p.ans.push([it.id, ok ? 1 : 0, now - (150 - i) * 50 * 60000]); if (!ok && i % 3 === 0) p.err[it.id] = now; }
+  p.ans = shuffle(p.ans, r).map((a, i) => [a[0], a[1], now - (150 - i) * 50 * 60000]); p.ini = 44; p.hist = hist; p.xpBase = 2460 - p.ans.reduce((s, a) => s + (a[1] ? 10 : 2), 0);
+  p.tools = { mision: 9, tarjetas: 7, listening: 6, mixta: 4, tema: 5, corto: 2, dictado: 3 }; p.ins = { primera: hoy(), q100: hoy(), racha3: hoy(), racha7: hoy() }; p.ultAvance = now; return p; }
 function nuevoPerfil(o) { return Object.assign({ creado: hoy(), ans: [], tema: {}, err: {}, dias: {}, tools: {}, cards: {}, meta: 10, sombra: null, comps: {}, ini: null, ins: {} }, o); }
 function estimado(p) { const a = p.ans.slice(-150); if (a.length < 20) return null; return Math.round(100 * a.filter(x => x[1]).length / a.length); }
 function semana(p, ini) { let q = 0, c = 0; p.ans.forEach(x => { const d = hoy(new Date(x[2])); if (d >= ini && diasEntre(ini, d) < 7) { q++; c += x[1] ? 1 : 0; } }); return [q, c]; }
@@ -59,7 +70,7 @@ function registrar(p, it, ok) {
   const t = p.tema[it.t] || (p.tema[it.t] = [0, 0]); t[0]++; if (ok) t[1]++;
   if (ok) delete p.err[it.id]; else p.err[it.id] = now;
   const dd = p.dias[d] || (p.dias[d] = { q: 0, min: 0 }); dd.q++; dd.min += Math.min(2, (now - prev) / 60000 || 0.5);
-  if (p.ini == null) { const e = estimado(p); if (e != null) p.ini = e; }
+  const e = estimado(p); if (p.ini == null && e != null) p.ini = e; if (e != null) { p.hist = p.hist || {}; p.hist[d] = e; }
 }
 function usar(tool) { const p = P(); if (!p) return; p.tools[tool] = (p.tools[tool] || 0) + 1; save(); }
 const codNum = (fecha, F, min) => String(hash(`${SECRET}|EV|${fecha}|${F}|${min}`) % 10000).padStart(4, '0');
@@ -92,6 +103,7 @@ function vLogin() {
   <div class="g2"><label>Grupo pedagógico<input id="lgp" placeholder="Ej. 2B"></label><label>Grupo de inglés<input id="lgi" placeholder="Ej. 3"></label></div>` : ''}
   <label>Código de acceso<input id="lcod" type="password" autocapitalize="characters"></label>
   <button class="btn big" onclick="entrar()">Entrar</button>
+  <div class="row"><button class="btn ghost" style="flex:1" onclick="ayuda()">Instructivos</button><button class="btn ghost" style="flex:1" onclick="entrarPiloto()">Usuario piloto</button></div>
   <p class="mini">Tus datos se guardan solo en este dispositivo. Funciona sin internet una vez abierta.</p></div>`;
 }
 function entrar() {
@@ -105,15 +117,17 @@ function entrar() {
   }
   tab = loginPerfil === 'admin' ? 'avance' : 'hoy'; save(); render();
 }
-function salir() { if (!confirm('¿Cerrar sesión? Tu avance queda guardado en este dispositivo.')) return; S.sesion = null; save(); render(); }
+function entrarPiloto() { const c = prompt('Código del usuario piloto (lo da la Mesa de Inglés):'); if (c == null) return; if (norm(c) !== PILOTO.code) return toast('Código de piloto incorrecto.');
+  S.perfiles[PILOTO.m] = crearPiloto(); S.sesion = { perfil: 'cadete', nombre: PILOTO.nombre, m: PILOTO.m }; tab = 'hoy'; save(); render(); if (confirm('¿Activar el modo presentación (guion paso a paso)?')) presentar(0); }
+function salir() { if (esPiloto()) { if (!confirm('¿Cerrar el usuario piloto? Su práctica de ejemplo se borra y el equipo queda en cero.')) return; delete S.perfiles[PILOTO.m]; S.sesion = null; save(); render(); return; } if (!confirm('¿Cerrar sesión? Tu avance queda guardado en este dispositivo.')) return; S.sesion = null; save(); render(); }
 
 let tab = 'hoy';
 function vUsuario() {
   const p = P(), tabs = [['hoy', 'Hoy', '☀'], ['practicar', 'Practicar', '✎'], ['tecnicas', 'Técnicas', '★'], ['ejercicio', 'Ejercicio', '⏱'], ['sombra', 'Mi sombra', '⚑']];
   if (p.perfil === 'planta' && paseActivo()) tabs.push(['aplicar', 'Aplicar', '✔']);
   const body = { hoy: vHoy, practicar: vPracticar, tecnicas: vTecnicas, ejercicio: vEjercicio, sombra: vSombra, aplicar: vAplicar }[tab] || vHoy;
-  return `<header><div><b>${esc(p.nombre)}</b><span>${p.perfil === 'cadete' ? `${p.anio}° año · ${esc(p.gp || '')}` : 'Planta docente'}</span></div><button class="ico" onclick="tema()" title="Tema">◐</button></header>
-  <main>${body(p)}</main><nav class="tabbar">${tabs.map(([k, l, i]) => `<button class="${tab === k ? 'on' : ''}" onclick="tab='${k}';render();scrollTo(0,0)"><i>${i}</i>${l}</button>`).join('')}</nav>`;
+  return `<header><div><b>${esc(p.nombre)}</b><span>${p.perfil === 'cadete' ? `${p.anio}° año · ${esc(p.gp || '')}` : 'Planta docente'}</span></div><button class="ico" onclick="ayuda()" title="Ayuda">?</button><button class="ico" onclick="tema()" title="Tema">◐</button></header>
+  ${p.piloto ? `<div class="pilotbar">Usuario piloto · demostración <button onclick="presentar(GUION_I||0)">Guion</button></div>` : ''}<main>${body(p)}</main><nav class="tabbar">${tabs.map(([k, l, i]) => `<button class="${tab === k ? 'on' : ''}" onclick="tab='${k}';render();scrollTo(0,0)"><i>${i}</i>${l}</button>`).join('')}</nav>`;
 }
 function tema() { S.tema = S.tema === 'claro' ? 'oscuro' : 'claro'; save(); render(); }
 const TECNICAS = [
@@ -132,18 +146,23 @@ function vHoy(p) {
   INSIGNIAS.forEach(([k, , f]) => { if (f(p) && !p.ins[k]) { p.ins[k] = hoy(); save(); } });
   const est = estimado(p), meta = METAS[p.anio] || 60, min = Math.round((p.dias[hoy()] || {}).min || 0), pct = Math.min(100, Math.round(100 * min / p.meta)), tec = tecnicaHoy();
   const hecha = (p.tools['mision:' + hoy()] || 0) > 0, w = semana(p, lunes()), ranking = rankingSemanal(p, 'anio').slice(0, 3);
-  return `${p.perfil === 'planta' ? cardPase(p) : ''}
+  const sinEnviar = !p.piloto && p.perfil === 'cadete' && p.ans.length >= 10 && (!p.ultAvance || Date.now() - p.ultAvance > 3 * 864e5);
+  return `${p.perfil === 'planta' ? cardPase(p) : ''}${sinEnviar ? `<section class="card aviso"><b>Tu coordinadora todavía no ve tu práctica.</b> <button class="btn sm" onclick="enviarAvance();document.querySelector('#avout').scrollIntoView()">Generar mi código de avance</button></section>` : ''}
+  ${!p.ans.length ? `<section class="card aviso2"><h3>Descubre tu nivel</h3><p class="mini">12 preguntas, unos 8 minutos, sin calificación. Con ellas la app arma tu ruta.</p><button class="btn" onclick="iniciar('nivel')">Empezar</button></section>` : ''}
+  <section class="kpis k3"><div><b>${xp(p).toLocaleString('es-MX')}</b><span>XP</span></div><div><b>${racha(p)}</b><span>Días seguidos</span></div><div><b>${est ?? '—'}</b><span>Puntaje estimado</span></div></section>
   <section class="card hero"><div class="ring" style="--p:${pct}"><b>${min}</b><span>de ${p.meta} min</span></div><div><h2>Meta diaria</h2><p>${pct >= 100 ? '¡Cumplida! 🎖' : 'Racha: ' + racha(p) + ' día(s)'}</p><button class="btn" onclick="iniciar('mision')">${hecha ? 'Repetir' : 'Iniciar'} Misión de hoy · 8</button></div></section>
   <section class="card"><h3>Puntaje estimado</h3>${est == null ? `<p class="mini">Responde al menos 20 preguntas para estimarlo (llevas ${p.ans.length}).</p>` :
       `<div class="score"><b>${est}</b><div class="bar"><i style="width:${est}%"></i><em style="left:${meta}%">${meta}</em><em class="gold" style="left:60%">60</em></div></div>
-      <p>${p.perfil === 'cadete' ? (est >= meta ? `Ya alcanzas la meta de ${p.anio}° año (${meta}).` : `Te faltan <b>${meta - est}</b> puntos para la meta de ${p.anio}° año.`) + ' ' : ''}${est >= 60 ? '¡Nivel Barra I!' : `A la Barra I (60): <b>${60 - est}</b> puntos.`}</p>`}</section>
+      <p>${p.perfil === 'cadete' ? (p.anio == 4 ? '' : (est >= meta ? `Ya alcanzas la meta de ${p.anio}° año (${meta}). ` : `Te faltan <b>${meta - est}</b> puntos para la meta de ${p.anio}° año. `)) : ''}${est >= 60 ? '¡Nivel Barra I!' : `Te faltan <b>${60 - est}</b> puntos para la Barra I.`}</p>${grafica(p)}`}</section>
   <section class="card"><h3>Técnica del día · ${esc(tec[0])}</h3><p>${esc(tec[1])}</p></section>
   <section class="row2"><button class="tile" onclick="iniciarTarjetas()"><b>Tarjetas</b><span>${tarjetasPendientes(p).length} por repasar</span></button><button class="tile" onclick="tab='sombra';render()"><b>Competencia</b><span>${ranking.length > 1 ? ranking.map((r, i) => `${i + 1}. ${esc(r.n.split(' ')[0])} ${r.w}`).join(' · ') : 'Esta semana: ' + w[1] + ' aciertos'}</span></button></section>
   <section class="card"><h3>Insignias</h3><div class="badges">${INSIGNIAS.map(([k, l]) => `<span class="${p.ins[k] ? 'on' : ''}">${p.ins[k] ? '🏅' : '○'} ${l}</span>`).join('')}</div></section>
   <section class="card"><h3>Enviar mi avance</h3><p class="mini">Genera tu código y envíalo a la Mesa de Inglés (por WhatsApp). El más reciente reemplaza al anterior.</p>
   <div class="row"><button class="btn" id="btnav" onclick="enviarAvance()">Generar código</button><button class="btn ghost" onclick="salir()">Cerrar sesión</button></div><div id="avout"></div></section>`;
 }
-function enviarAvance() { usar('avance'); const p = P(), c = codigoAvance(p), txt = `Avance Misión Barra I — ${p.nombre} (${p.m})\n${c}`;
+function grafica(p) { const h = Object.entries(p.hist || {}).sort().slice(-14); if (h.length < 2) return ''; const v = h.map(x => x[1]), mn = Math.min(...v, 40) - 2, mx = Math.max(...v, 60) + 2, W = 300, H = 90, X = i => 10 + i * (W - 20) / (h.length - 1), Y = y => H - 10 - (y - mn) * (H - 20) / (mx - mn);
+  return `<svg class="graf" viewBox="0 0 ${W} ${H}"><line x1="0" x2="${W}" y1="${Y(60)}" y2="${Y(60)}" class="g60"/><text x="${W - 4}" y="${Y(60) - 3}" text-anchor="end">Barra I 60</text><polyline points="${v.map((y, i) => X(i) + ',' + Y(y)).join(' ')}"/>${v.map((y, i) => i === 0 || i === v.length - 1 ? `<circle cx="${X(i)}" cy="${Y(y)}" r="3.5"/><text x="${X(i)}" y="${Y(y) - 7}" text-anchor="middle">${y}</text>` : '').join('')}</svg><p class="mini">Tu avance: de ${v[0]} a ${v[v.length - 1]} puntos.</p>`; }
+function enviarAvance() { if (esPiloto()) return toast('El usuario piloto no envía avance (solo demostración).'); P().ultAvance = Date.now(); usar('avance'); const p = P(), c = codigoAvance(p), txt = `Avance Misión Barra I — ${p.nombre} (${p.m})\n${c}`;
   $('#avout').innerHTML = `<textarea readonly class="code" id="avcode">${esc(c)}</textarea><div class="row"><button class="btn" onclick="copiar($('#avcode').value)">Copiar</button><a class="btn ghost" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(txt)}">WhatsApp</a></div>`; }
 function copiar(t) { const f = () => { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); toast('Copiado'); }; if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => toast('Copiado'), f); else f(); }
 function vPracticar(p) {
@@ -197,7 +216,8 @@ function hablar(t, rate = .9) { if (!('speechSynthesis' in window)) return toast
 function iniciar(modo) {
   const p = P(); let ids, opt = { modo, fb: true, tiempo: 0 };
   const all = BANCO.map(b => b.id);
-  if (modo === 'mision') { const r = rng('mision' + hoy() + p.m); ids = shuffle(POOL_L(), r).slice(0, 3).map(b => b.id).concat(shuffle(POOL_R(), r).slice(0, 5).map(b => b.id)); }
+  if (modo === 'mision') { const r = rng('mision' + hoy() + p.m), e = shuffle(Object.keys(p.err), r).slice(0, 2), d = shuffle(BANCO.filter(b => b.t === temaDebil(p)), r).slice(0, 2).map(b => b.id); ids = [...new Set(e.concat(d, shuffle(POOL_L(), r).slice(0, 3).map(b => b.id), shuffle(POOL_R(), r).slice(0, 4).map(b => b.id)))].slice(0, 8); }
+  else if (modo === 'nivel') { const r = rng('nivel' + p.m); ids = shuffle(POOL_L(), r).slice(0, 4).map(b => b.id).concat(shuffle(POOL_R(), r).slice(0, 8).map(b => b.id)); }
   else if (modo === 'errores') ids = shuffle(Object.keys(p.err)).slice(0, 10);
   else if (modo === 'mixta') ids = shuffle(all).slice(0, 15);
   else if (modo === 'listening') ids = shuffle(POOL_L().map(b => b.id).concat(['lin' + Math.floor(Math.random() * 99999)])).slice(0, 5);
@@ -226,9 +246,9 @@ function pintarQ() {
   $('#app').innerHTML = `<div class="quiz"><header><button class="ico" onclick="abandonar()">✕</button><div class="prog"><i style="width:${100 * (Q.i + 1) / n}%"></i></div><span>${Q.i + 1}/${n}</span>${Q.tiempo ? '<b id="qt"></b>' : ''}${Q.oficial ? `<em>Salidas: ${Q.sal}/3</em>` : ''}</header>
   <main><small class="tag">${TEMAS[it.t]}</small>${it.pas ? `<div class="pas">${esc(it.pas)}</div>` : ''}
   ${it.lis ? `<div class="audio"><button class="btn big" onclick="play()" ${pl >= lim ? 'disabled' : ''}>▶ Escuchar${Q.oficial ? ` (${lim - pl})` : ''}</button>${Q.oficial ? '' : '<button class="btn ghost" onclick="hablar(Q.items[Q.i].it.au,.6)">Lento</button>'}</div>` : ''}
-  ${it.q ? `<p class="q">${esc(it.q).replace('___', '<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>')}</p>` : it.lis ? '<p class="q mini">Escucha y elige la mejor respuesta.</p>' : ''}
+  ${it.q ? `<p class="q">${esc(it.q).replace('___', '<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>')}</p>` : it.lis ? `<p class="q mini">${it.t === 'lrc' ? '¿Qué oración escuchaste?' : 'Escucha y elige la mejor respuesta.'}</p>` : ''}
   <div class="opts">${ord.map((o, k) => { let c = ''; if (Q.fb && sel != null) c = o === 0 ? 'ok' : (sel === o ? 'bad' : ''); else if (sel === o) c = 'sel'; return `<button class="${c}" onclick="responder(${o})" ${Q.fb && sel != null ? 'disabled' : ''}><b>${'ABCD'[k]}</b>${esc(it.o[o])}</button>`; }).join('')}</div>
-  ${Q.fb && sel != null && it.lis ? `<p class="mini">Audio: “${esc(it.au)}”</p>` : ''}</main>
+  ${Q.fb && sel != null ? `<div class="pista"><b>${sel === 0 ? '✔ Correcto.' : '✘ Respuesta correcta: ' + esc(it.o[0])}</b>${it.lis ? `<br>Audio: “${esc(it.au)}”` : ''}<br>${PISTA[it.t] || ''}</div>` : ''}</main>
   <footer><button class="btn ghost" onclick="mover(-1)" ${Q.i ? '' : 'disabled'}>Anterior</button>${Q.i < n - 1 ? `<button class="btn" onclick="mover(1)">Siguiente</button>` : `<button class="btn" id="entregar" onclick="if(confirm('¿Entregar?'))terminar()">Entregar</button>`}</footer></div>`;
   if (Q.tiempo) tick();
   if (it.lis && pl === 0 && sel == null && !Q.oficial) play();
@@ -242,7 +262,7 @@ function terminar() {
   const q = Q, of = q.oficial; q.oficial = false; limpiarQ(); const p = P(); let ok = 0;
   q.items.forEach((x, i) => { const r = q.resp[i] === 0; if (r) ok++; if (!q.fb && !of) registrar(p, x.it, r); });
   const pts = Math.round(100 * ok / q.items.length); let extra = '';
-  if (of) { const fo = folio(p.m, q.code, pts, q.sal); S.resultados.push({ n: p.nombre, m: p.m, tipo: p.perfil, anio: p.anio, gp: p.gp, gi: p.gi, code: q.code, F: q.F, pts, sal: q.sal, folio: fo, fecha: hoy(), hora: new Date().toTimeString().slice(0, 5) });
+  if (of) { const fo = folio(p.m, q.code, pts, q.sal); S.resultados.push({ n: p.nombre, m: p.m, tipo: p.piloto ? 'Piloto' : p.perfil, anio: p.anio, gp: p.gp, gi: p.gi, code: q.code, F: q.F, pts, sal: q.sal, folio: fo, fecha: hoy(), hora: new Date().toTimeString().slice(0, 5) });
     extra = `<div class="bigcode" id="fpts">${pts}</div><p>Puntaje</p><div class="bigcode sm mono" id="ffolio">${fo}</div><p>Folio · Salidas: ${q.sal}</p><p class="mini">Muestra esta pantalla al aplicador. Las respuestas correctas no se muestran para proteger las preguntas.</p>`; }
   else { if (q.F) { p.formas = p.formas || {}; p.formas[q.F] = pts; } extra = `<div class="bigcode">${ok}/${q.items.length}</div><p>${pts}% de aciertos</p>`; }
   save(); Q = null;
@@ -262,10 +282,10 @@ let fil = { anio: '', gp: '', gi: '', dia: '' }, grupoPor = 'gp';
 function vMando() {
   const tabs = [['mando', 'Mando'], ['avance', 'Avance'], ['antig', 'Antigüedad'], ['estad', 'Estadística'], ['areas', 'Áreas'], ['riesgo', 'En riesgo'], ['eval', 'Evaluación'], ['aplic', 'Aplicadores'], ['ajustes', 'Ajustes']];
   const body = { avance: mAvance, antig: mAntig, estad: mEstad, areas: mAreas, riesgo: mRiesgo, eval: mEval, aplic: mAplic, ajustes: mAjustes, mando: mMando }[tab] || mAvance;
-  return `<header><div><b>Centro de mando</b><span>${esc(S.sesion.nombre)} · Administración</span></div><button class="ico" onclick="tema()" title="Tema">◐</button><button class="ico" onclick="salir()" title="Cerrar sesión">⎋</button></header>
+  return `<header><div><b>Centro de mando</b><span>${esc(S.sesion.nombre)} · Administración</span></div><button class="ico" onclick="ayuda()" title="Instructivos">?</button><button class="ico" onclick="tema()" title="Tema">◐</button><button class="ico" onclick="salir()" title="Cerrar sesión">⎋</button></header>
   <nav class="tabs">${tabs.map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-tab="${k}" onclick="tab='${k}';render()">${l}</button>`).join('')}</nav><main class="wide">${body()}</main>`;
 }
-const AV = () => Object.values(S.avances).filter(a => a.pf !== 'planta');
+const AV = () => Object.values(S.avances).filter(a => a.pf !== 'planta' && a.m !== PILOTO.m);
 function filtrar(list) { return list.filter(a => (!fil.anio || String(a.a) === fil.anio) && (!fil.gp || a.gp === fil.gp) && (!fil.gi || a.gi === fil.gi) && (!fil.dia || (a.dias && a.dias[fil.dia]))); }
 function filtros(conDia = true) { const all = AV().concat(S.padron), opts = k => [...new Set(all.map(a => a[k]).filter(Boolean))].sort();
   return `<div class="filtros"><select onchange="fil.anio=this.value;render()"><option value="">Todos los años</option>${[1, 2, 3, 4].map(a => `<option ${fil.anio == a ? 'selected' : ''} value="${a}">${a}° año</option>`).join('')}</select>
@@ -290,7 +310,7 @@ function filaAv(a) { return { Nombre: a.n, Matrícula: a.m, Año: a.a, 'Grupo pe
 function tablaAv(L) { if (!L.length) return '<p class="mini">Aún no hay avances importados.</p>'; return `<div class="tw"><table><tr><th>Nombre</th><th>Año</th><th>Grupo</th><th>Preg.</th><th>Inicio</th><th>Estimado</th><th>Última</th><th></th></tr>${L.sort((a, b) => (a.a - b.a) || a.n.localeCompare(b.n)).map(a => `<tr><td>${esc(a.n)}<small>${esc(a.m)}</small></td><td>${a.a}°</td><td>${esc(a.gp)}${a.gi ? ' / ' + esc(a.gi) : ''}</td><td>${a.q}</td><td>${a.ini ?? '—'}</td><td><b class="${a.est >= METAS[a.a] ? 'okt' : ''}">${a.est ?? '—'}</b></td><td>${ultimo(a)}</td><td><button class="btn sm ghost" onclick="delAv('${esc(a.m)}')">✕</button></td></tr>`).join('')}</table></div>`; }
 function delAv(m) { if (confirm('¿Quitar este avance del Centro de mando?')) { delete S.avances[m]; save(); render(); } }
 function importar(txt) { const { ok, bad } = leerCodigos(txt ?? $('#impin').value); let n = 0;
-  ok.forEach(o => { const prev = S.avances[o.m]; if (!prev || prev.ts <= o.ts) { S.avances[o.m] = o; n++; } (o.ex || []).forEach(e => { if (!S.registro.some(r => r.m === o.m && r.code === e[0])) S.registro.push({ n: o.n, m: o.m, tipo: o.pf, anio: o.a, gp: o.gp, gi: o.gi, code: e[0], pts: e[1], sal: e[2], folio: e[3], fecha: e[4], fuente: 'código de avance', valido: folio(o.m, e[0], e[1], e[2]) === e[3] }); }); });
+  ok.filter(o => o.m !== PILOTO.m).forEach(o => { const prev = S.avances[o.m]; if (!prev || prev.ts <= o.ts) { S.avances[o.m] = o; n++; } (o.ex || []).forEach(e => { if (!S.registro.some(r => r.m === o.m && r.code === e[0])) S.registro.push({ n: o.n, m: o.m, tipo: o.pf, anio: o.a, gp: o.gp, gi: o.gi, code: e[0], pts: e[1], sal: e[2], folio: e[3], fecha: e[4], fuente: 'código de avance', valido: folio(o.m, e[0], e[1], e[2]) === e[3] }); }); });
   save(); render(); const msg = `Entraron ${n} código(s)${ok.length - n ? `; ${ok.length - n} más antiguo(s) que el guardado` : ''}${bad ? `; rechazados: ${bad} (incompletos o alterados)` : ''}.`; toast(msg); return { n, bad }; }
 function importArchivo(inp) { const f = inp.files[0]; if (f) f.text().then(t => importar(t)); }
 const prom = arr => { const v = arr.filter(x => x != null && x !== ''); return v.length ? Math.round(v.reduce((a, b) => a + +b, 0) / v.length) : null; };
@@ -298,7 +318,7 @@ function mAntig() { const L = AV(); if (!L.length) return vacio('Sin avances imp
   return `<section class="card"><h3>Puntaje por antigüedad</h3><div class="tw"><table><tr><th>Año</th><th>Cadetes</th><th>Inicio</th><th>Actual</th><th>Meta</th><th>Avance</th><th>Alcanzan meta</th></tr>${[1, 2, 3, 4].map(y => { const g = L.filter(a => a.a == y), i = prom(g.map(a => a.ini)), c = prom(g.map(a => a.est)), al = g.filter(a => a.est >= METAS[y]).length; return `<tr><td>${y}° año</td><td>${g.length}</td><td>${i ?? '—'}</td><td><b>${c ?? '—'}</b></td><td>${METAS[y]}</td><td>${i != null && c != null ? (c - i >= 0 ? '+' : '') + (c - i) : '—'}</td><td>${g.length ? al + ' (' + Math.round(100 * al / g.length) + '%)' : '—'}</td></tr>`; }).join('')}</table></div>
   <div class="ant">${[1, 2, 3, 4].map(y => { const g = L.filter(a => a.a == y), c = prom(g.map(a => a.est)), i = prom(g.map(a => a.ini)); return `<div><span>${y}°</span><div class="bar"><i class="ini" style="width:${i || 0}%"></i><i class="cur" style="width:${c || 0}%"></i><em style="left:${METAS[y]}%">${METAS[y]}</em></div></div>`; }).join('')}</div><p class="mini">Barra clara: inicio · barra fuerte: actual · marca: meta del año.</p></section>`; }
 function todosRes() { const all = S.resultados.map(r => ({ ...r, fuente: 'este equipo', valido: folio(r.m, r.code, r.pts, r.sal) === r.folio })).concat(S.registro); const seen = {}; return all.filter(r => { const k = r.m + '|' + r.code; if (seen[k]) return false; return seen[k] = true; }); }
-function mEstad() { const R = todosRes().filter(r => r.tipo !== 'planta' && (!fil.anio || String(r.anio) === fil.anio) && (!fil.gp || r.gp === fil.gp) && (!fil.gi || r.gi === fil.gi));
+function mEstad() { const R = todosRes().filter(r => r.tipo !== 'planta' && r.tipo !== 'Piloto' && (!fil.anio || String(r.anio) === fil.anio) && (!fil.gp || r.gp === fil.gp) && (!fil.gi || r.gi === fil.gi));
   const grupos = {}; R.forEach(r => { const k = `${r.anio}°|${r[grupoPor] || 's/g'}`; (grupos[k] = grupos[k] || []).push(r); });
   return `${filtros(false)}<section class="card"><div class="row sp"><h3>Evaluaciones oficiales</h3><div class="seg sm"><button class="${grupoPor === 'gp' ? 'on' : ''}" onclick="grupoPor='gp';render()">Pedagógico</button><button class="${grupoPor === 'gi' ? 'on' : ''}" onclick="grupoPor='gi';render()">Inglés</button></div></div>
   ${R.length ? `<div class="tw"><table><tr><th>Año</th><th>Grupo</th><th>Cadetes</th><th>Promedio</th><th>Mín.</th><th>Máx.</th><th>% meta año</th><th>% Barra I</th></tr>${Object.entries(grupos).sort().map(([k, g]) => { const [y, gr] = k.split('|'), v = g.map(r => +r.pts), mt = METAS[parseInt(y)] || 60; return `<tr><td>${y}</td><td>${esc(gr)}</td><td>${g.length}</td><td><b>${prom(v)}</b></td><td>${Math.min(...v)}</td><td>${Math.max(...v)}</td><td>${Math.round(100 * v.filter(x => x >= mt).length / v.length)}%</td><td>${Math.round(100 * v.filter(x => x >= 60).length / v.length)}%</td></tr>`; }).join('')}</table></div>
@@ -329,7 +349,7 @@ function mEval() { const c = codigoEval(evF, evMin), R = todosRes();
   return `<section class="card"><h3>Código de evaluación del día</h3><div class="g2"><label>Forma<select onchange="evF=this.value;render()">${FORMAS.map(f => `<option ${f === evF ? 'selected' : ''}>${f}</option>`).join('')}</select></label><label>Duración<select onchange="evMin=+this.value;render()">${[70, 60, 45, 30].map(m => `<option value="${m}" ${m === evMin ? 'selected' : ''}>${m} min · ${DUR_Q[m]} preg.</option>`).join('')}</select></label></div>
   <div id="evc" class="bigcode hide">${c}</div><div class="row"><button class="btn" id="btngen" onclick="$('#evc').classList.remove('hide')">Generar código</button><button class="btn ghost" onclick="copiar('${c}')">Copiar</button></div><p class="mini">Vigente solo hoy (${hoy()}). Cada evaluado recibe preguntas y opciones en distinto orden.</p></section>
   <section class="card"><div class="row sp"><h3>Resultados (${R.length})</h3><div class="row"><button class="btn sm ghost" onclick="expRes('xlsx')">Excel</button><button class="btn sm ghost" onclick="expRes('csv')">CSV</button></div></div><p class="mini">De este equipo, de los códigos de avance y del registro del aplicador.</p>
-  ${R.length ? `<div class="tw"><table><tr><th>Evaluado</th><th>Tipo</th><th>Matrícula</th><th>Forma</th><th>Fecha</th><th>Puntaje</th><th>Salidas</th><th>Folio</th><th>Fuente</th></tr>${R.slice().reverse().map(r => `<tr><td>${esc(r.n)}</td><td>${r.tipo}</td><td>${esc(r.m)}</td><td>${r.code}</td><td>${r.fecha}</td><td><b>${r.pts}</b></td><td>${r.sal}</td><td class="mono ${r.valido ? '' : 'badt'}">${r.folio}${r.valido ? '' : ' ⚠'}</td><td><small>${r.fuente}</small></td></tr>`).join('')}</table></div>` : '<p class="mini">Sin resultados.</p>'}</section>${vVerificar()}`; }
+  ${R.length ? `<div class="tw"><table><tr><th>Evaluado</th><th>Tipo</th><th>Matrícula</th><th>Forma</th><th>Fecha</th><th>Puntaje</th><th>Salidas</th><th>Folio</th><th>Fuente</th></tr>${R.slice().reverse().map(r => `<tr><td>${esc(r.n)}</td><td>${r.tipo === 'Piloto' ? '<span class="tagp">Piloto</span>' : r.tipo}</td><td>${esc(r.m)}</td><td>${r.code}</td><td>${r.fecha}</td><td><b>${r.pts}</b></td><td>${r.sal}</td><td class="mono ${r.valido ? '' : 'badt'}">${r.folio}${r.valido ? '' : ' ⚠'}</td><td><small>${r.fuente}</small></td></tr>`).join('')}</table></div>` : '<p class="mini">Sin resultados.</p>'}</section>${vVerificar()}`; }
 function mAplic() { const now = new Date(), hs = []; for (let h = now.getHours() + 1; h <= 23; h++) hs.push(h);
   return `<section class="card"><h3>Emitir pase de aplicador</h3><div class="g2"><input id="apn" placeholder="Grado y nombre del docente"><input id="apm" placeholder="Matrícula del docente"></div><div class="g3"><label>Forma<select id="apf">${FORMAS.map(f => `<option>${f}</option>`).join('')}</select></label><label>Duración<select id="apd">${[70, 60, 45, 30].map(m => `<option>${m}</option>`).join('')}</select></label><label>Válido hoy hasta<select id="aph">${hs.map(h => `<option value="${h}" ${h === Math.min(23, now.getHours() + 3) ? 'selected' : ''}>${pad(h)}:00</option>`).join('')}</select></label></div>${hs.length ? '<button class="btn" id="btnpase" onclick="emitirPase()">Generar pase</button>' : '<p class="mini">Ya no quedan horas hoy para emitir pases.</p>'}<div id="apout"></div></section>
   <section class="card"><h3>Pases emitidos en este equipo</h3>${S.pases.length ? `<div class="tw"><table><tr><th>Docente</th><th>Matrícula</th><th>Pase</th><th>Estado</th><th></th></tr>${S.pases.map((p, i) => [p, i]).reverse().map(([p, i]) => { const st = p.off ? 'Desactivado' : (p.dia !== hoy() || now.getHours() >= p.hh) ? 'Vencido' : 'Activo'; return `<tr><td>${esc(p.n)}</td><td>${esc(p.m)}</td><td class="mono">${p.code}</td><td class="${st === 'Activo' ? 'okt' : 'mini'}">${st}</td><td>${st === 'Activo' ? `<button class="btn sm ghost" onclick="S.pases[${i}].off=true;save();render()">Desactivar</button>` : ''}</td></tr>`; }).join('')}</table></div>` : '<p class="mini">Ninguno.</p>'}<p class="mini">Sin servidor, desactivar solo surte efecto en este equipo; en el del docente el pase vence a la hora indicada.</p></section>`; }
@@ -339,7 +359,7 @@ function mAjustes() { return `<section class="card"><h3>Cambio de códigos de ac
   <section class="card"><h3>Respaldo</h3><p class="mini">Guarda todo (avances, padrón, resultados, pases y ajustes) en un archivo JSON. Úsalo para pasar los datos a otro equipo o a la computadora de la Mesa.</p><div class="row"><button class="btn" onclick="respaldo()">Descargar respaldo</button><label class="btn ghost">Restaurar respaldo<input type="file" hidden accept=".json,application/json" onchange="restaurar(this)"></label></div></section>
   <section class="card"><h3>Este dispositivo</h3><p class="mini">Versión ${VER} · ${BANCO.length} preguntas fijas + listening generado · ${navigator.onLine ? 'en línea' : 'sin internet'} · ${'serviceWorker' in navigator && navigator.serviceWorker.controller ? 'lista para usarse sin internet ✔' : 'ábrela una vez con internet para usarla sin conexión'}</p></section>`; }
 function guardarCodigos() { const ch = { cadete: $('#kc').value, planta: $('#kp').value, admin: $('#ka').value }; let n = 0; for (const k in ch) { const v = ch[k].trim(); if (v && !/^[A-Za-z0-9-]{6,24}$/.test(v)) return toast(`Código de ${k} no válido (6 a 24: letras sin acento, números o guiones).`); } for (const k in ch) { const v = ch[k].trim(); if (v) { S.codes[k] = v.toUpperCase(); n++; } } if (!n) return toast('No escribiste ningún código nuevo.'); save(); render(); toast('Códigos actualizados'); }
-function mMando() { const L = AV(), R = riesgos(), Rs = todosRes(), hoyAct = L.filter(a => a.dias && a.dias[hoy()]).length;
+function mMando() { const L = AV(), R = riesgos(), Rs = todosRes().filter(r => r.tipo !== 'Piloto'), hoyAct = L.filter(a => a.dias && a.dias[hoy()]).length;
   return `<section class="kpis"><div><b>${L.length}${S.padron.length ? '/' + S.padron.length : ''}</b><span>Con avance${S.padron.length ? ' / padrón' : ''}</span></div><div><b>${hoyAct}</b><span>Practicaron hoy</span></div><div><b class="badt">${R.length}</b><span>En riesgo</span></div><div><b>${Rs.length}</b><span>Evaluaciones</span></div></section>
   <section class="card"><h3>Metas de egreso</h3><div class="tw"><table><tr><th>Año</th><th>Meta</th><th>Promedio actual</th><th>Faltan</th></tr>${[1, 2, 3, 4].map(y => { const c = prom(L.filter(a => a.a == y).map(a => a.est)); return `<tr><td>${y}° año${y === 4 ? ' (Barra I)' : ''}</td><td>${METAS[y]}</td><td>${c ?? '—'}</td><td>${c != null ? Math.max(0, METAS[y] - c) : '—'}</td></tr>`; }).join('')}</table></div></section>
   <section class="card"><h3>Descargas</h3><div class="row"><button class="btn" onclick="expTodo()">Libro de Excel completo</button><button class="btn ghost" onclick="respaldo()">Respaldo JSON</button></div></section>
@@ -352,7 +372,7 @@ function hoja(rows) { const ws = XLSX.utils.json_to_sheet(rows), keys = Object.k
 function exportar(rows, nombre, fmt, extra) { if (!rows.length) return toast('No hay datos para exportar.'); const f = `${nombre}_${hoy()}`;
   if (fmt === 'csv' || typeof XLSX === 'undefined') { const k = Object.keys(rows[0]); const csv = '\ufeff' + [k.join(',')].concat(rows.map(r => k.map(x => `"${String(r[x] ?? '').replace(/"/g, '""')}"`).join(','))).join('\r\n'); return descargar(new Blob([csv], { type: 'text/csv;charset=utf-8' }), f + '.csv'); }
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, hoja(rows), nombre.slice(0, 31)); (extra || []).forEach(([n, r]) => r.length && XLSX.utils.book_append_sheet(wb, hoja(r), n)); XLSX.writeFile(wb, f + '.xlsx'); }
-const filasRes = () => todosRes().map(r => ({ Evaluado: r.n, Tipo: r.tipo, Matrícula: r.m, Año: r.anio, 'Grupo ped.': r.gp, 'Grupo inglés': r.gi, Código: r.code, Fecha: r.fecha, Puntaje: r.pts, Salidas: r.sal, Folio: r.folio, 'Folio válido': r.valido ? 'Sí' : 'No', Fuente: r.fuente }));
+const filasRes = () => todosRes().filter(r => r.tipo !== 'Piloto').map(r => ({ Evaluado: r.n, Tipo: r.tipo, Matrícula: r.m, Año: r.anio, 'Grupo ped.': r.gp, 'Grupo inglés': r.gi, Código: r.code, Fecha: r.fecha, Puntaje: r.pts, Salidas: r.sal, Folio: r.folio, 'Folio válido': r.valido ? 'Sí' : 'No', Fuente: r.fuente }));
 const filasRiesgo = () => riesgos().map(r => ({ Nombre: r.n, Matrícula: r.m, Año: r.a, Grupo: r.gp, Estimado: r.est ?? '', Motivo: r.motivo }));
 function expAvance(fmt) { exportar(filtrar(AV()).map(filaAv), 'Avance', fmt); }
 function expRes(fmt) { exportar(filasRes(), 'Resultados', fmt); }
@@ -366,3 +386,37 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) naviga
 if (window.speechSynthesis) speechSynthesis.getVoices();
 window.__mb1 = { S: () => S, codigoEval, generaPase, validaPase, folio, codigoAvance, leerCodigos, forma, BANCO, importar, iniciar, P };
 render();
+
+/* ---------- modo presentación (usuario piloto) ---------- */
+const GUION = [
+  ['hoy', 'Entrada y pantalla Hoy', 'Tres perfiles (cadete, planta y administración), cada uno con su código. En Hoy: 2,460 XP, 9 días seguidos, puntaje estimado de 51, “Te faltan 9 puntos para la Barra I”, meta diaria, gráfica de 44 a 51 e insignias.', 'El cadete sabe cada día cuánto le falta para egresar.'],
+  ['practicar', 'Practicar', 'Abrir Misión de hoy: pregunta con audio (Escuchar y Lento), respuesta correcta y pista en español al responder. Mostrar Listening rápido y práctica por tema.', 'Retroalimentación inmediata en cada pregunta; prioriza el tema más débil y los errores.'],
+  ['tecnicas', 'Técnicas', 'Nueve técnicas de estudio y el dictado con audio que marca las palabras falladas.', 'La aplicación enseña a estudiar, no solo a responder.'],
+  ['ejercicio', 'Ejercicio', '16 formas completas (100 preguntas, 70 min) y ejercicio corto (20 preguntas, 15 min).', 'Simulacro en condiciones del ALCPT.'],
+  ['ejercicio', 'Evaluación oficial', 'Escribir el código del día (Forma A, 30 min) y oprimir Iniciar: pantalla completa, registro de salidas y folio al concluir. El resultado queda marcado “Piloto”.', 'Evaluación con control de integridad.'],
+  ['sombra', 'Mi sombra', 'Pareja de estudio con meta semanal compartida y competencia semanal por antigüedad, grupo y compañía.', 'Compromiso entre compañeros.'],
+  ['fin', 'Centro de mando', 'Cerrar el usuario piloto (el equipo queda en cero) y entrar como Administración: Mando, Avance, Antigüedad, Estadística, Áreas, En riesgo, Evaluación y Aplicadores.', 'Seguimiento por cadete, grupo y año sin captura en papel.']];
+let GUION_I = null;
+function presentar(i) { GUION_I = Math.max(0, Math.min(GUION.length - 1, i)); const g = GUION[GUION_I]; if (g[0] !== 'fin' && S.sesion && esPiloto()) { tab = g[0]; render(); }
+  let el = $('#guion'); if (!el) { el = document.createElement('div'); el.id = 'guion'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="gh"><b>Paso ${GUION_I + 1} de ${GUION.length} · ${g[1]}</b><button onclick="cerrarGuion()">✕</button></div><p>${g[2]}</p><p class="mini"><b>Ventaja:</b> ${g[3]}</p><div class="row"><button class="btn sm ghost" onclick="presentar(GUION_I-1)" ${GUION_I ? '' : 'disabled'}>Anterior</button>${g[0] === 'fin' ? `<button class="btn sm" onclick="finPiloto()">Cerrar piloto e ir a Administración</button>` : `<button class="btn sm" onclick="presentar(GUION_I+1)">Siguiente</button>`}</div>`; }
+function cerrarGuion() { GUION_I = null; $('#guion')?.remove(); }
+function finPiloto() { if (esPiloto()) { delete S.perfiles[PILOTO.m]; S.sesion = null; save(); } cerrarGuion(); loginPerfil = 'admin'; render(); toast('Piloto cerrado. Entra con la clave de administración.'); }
+
+/* ---------- ayuda: instructivos por perfil ---------- */
+const AYUDA = {
+  cadete: ['Cadete', `<h3>Entrada</h3><ol><li>Abre el enlace de la aplicación que comparte tu docente.</li><li>Elige <b>Cadete</b>, escribe tu nombre completo (como en la lista oficial) y tu matrícula.</li><li>Elige año, compañía, grupo pedagógico y grupo de inglés.</li><li>Escribe el código de acceso que te dio la Mesa de Inglés y oprime <b>Entrar</b>.</li></ol><p class="mini">Usa siempre el mismo equipo y navegador: tu práctica se guarda ahí. Instálala: Android › menú ⋮ › Agregar a pantalla principal; iPhone › Compartir › Agregar a inicio. Después funciona sin internet.</p>
+  <h3>Primer día</h3><p>En Hoy oprime <b>Descubre tu nivel</b> (12 preguntas, unos 8 min, sin calificación). Con 20 respuestas aparece tu puntaje estimado. Metas de egreso: 1/er. año 42 · 2/o. 48 · 3/er. 54 · 4/o. 60 (Barra I). El estimado no es un resultado oficial.</p>
+  <h3>Uso diario (10 a 15 min)</h3><ol><li>Hoy › <b>Misión de hoy</b>: 8 preguntas con tu tema más débil y tus errores.</li><li>Hoy › <b>Tarjetas</b>: unos 5 minutos de repaso.</li><li>Practicar › <b>Listening rápido</b>: 5 audios. El listening vale la mitad del examen.</li></ol><p class="mini">Escuchar reproduce el audio con la voz en inglés de tu equipo; Lento lo repite despacio. Usa audífonos.</p>
+  <h3>Evaluación oficial</h3><ol><li>Ejercicio › escribe el código que te da tu aplicador (ej. B-70-1234) y oprime Iniciar. Solo sirve el día en que se genera.</li><li>Abre en pantalla completa. No cambies de aplicación, ventana ni pestaña: cada salida queda registrada y a la tercera se entrega sola.</li><li>Cada audio se puede escuchar 2 veces. Si dudas, elige la más probable: no se restan puntos.</li><li>Al concluir, muestra tu puntaje y tu folio al aplicador.</li></ol>
+  <h3>Envío de tu avance</h3><p>La coordinación no ve tu práctica hasta que envías tu código de avance (empieza con “MB1.”). Si aparece el recuadro naranja “Tu coordinadora todavía no ve tu práctica”, oprime <b>Generar mi código de avance</b> › Copiar o WhatsApp y envíalo completo. El más reciente reemplaza al anterior. Incluye tus evaluaciones oficiales con folio, no tus respuestas una por una.</p>
+  <h3>Mi sombra y competencia</h3><p>Asigna a tu pareja de estudio con su nombre y matrícula y una meta semanal compartida. Pega los códigos MB1 de tus compañeros para ver la competencia semanal por antigüedad, grupo o compañía.</p>
+  <h3>Problemas frecuentes</h3><ul><li>“Código de acceso incorrecto”: revisa que elegiste Cadete; pide el código a tu docente.</li><li>“Código no válido o no es de hoy”: pide al aplicador el código del día.</li><li>Tu práctica aparece en cero: entraste desde otro equipo o se borraron los datos del navegador.</li><li>No se oye el audio: sube el volumen; si tu equipo no tiene voz en inglés, instálala en Ajustes › Texto a voz.</li></ul>`],
+  planta: ['Planta y aplicador', `<h3>Entrada</h3><ol><li>Elige <b>Planta</b>, escribe grado y nombre y tu matrícula.</li><li>Escribe el código de planta que te dio la Mesa de Inglés y oprime Entrar.</li></ol><p>La planta practica con las mismas pantallas que los cadetes (Hoy, Practicar, Técnicas, Ejercicio y Mi sombra) y puede presentar la evaluación oficial; su resultado aparece como “planta” y no cuenta en la estadística de cadetes.</p>
+  <h3>Activar el pase de aplicador</h3><ol><li>La Mesa de Inglés te entrega un pase, por ejemplo <b>B70-1031-14-K3Q9</b>: forma B, 70 min, 31 oct, válido hasta las 14:00.</li><li>Entra con <b>tu</b> matrícula (la misma que dio la Mesa): con otra no funciona.</li><li>En Hoy › ¿Te habilitaron como aplicador? escribe el pase y oprime <b>Activar</b>. Aparece la pestaña <b>Aplicar</b>.</li></ol>
+  <h3>Aplicar la evaluación</h3><ol><li>En Aplicar está el <b>código del examen</b> del día (ej. B-70-4821). Díctalo a los evaluados.</li><li>Cada evaluado entra con su perfil, abre Ejercicio, escribe el código y oprime Iniciar.</li><li>Supervisa: la evaluación está en pantalla completa y registra cada salida; a la tercera se entrega sola.</li><li>Al concluir, anota de cada evaluado: <b>matrícula, puntaje, salidas y folio</b>. Ese registro es el respaldo oficial para la Mesa de Inglés.</li><li>En Aplicar puedes verificar cualquier folio: captura los cinco datos y oprime Verificar.</li></ol>
+  <h3>Vigencia</h3><p>El pase vale solo el día de su emisión y hasta la hora indicada; después la pestaña Aplicar desaparece. El código del examen cambia cada día.</p>
+  <h3>Problemas frecuentes</h3><ul><li>“El pase no corresponde a tu matrícula”: entraste con otra matrícula; cierra sesión y entra con la registrada.</li><li>“El pase ya venció”: pide uno nuevo a la Mesa de Inglés.</li><li>El evaluado ya presentó: una matrícula no puede presentar dos veces el mismo código en el mismo equipo.</li></ul>`]};
+let ayudaK = 'cadete';
+function ayuda(k) { if (k) ayudaK = k; let el = $('#ayuda'); if (!el) { el = document.createElement('div'); el.id = 'ayuda'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="ayc"><div class="gh"><b>Instructivos</b><button onclick="$('#ayuda').remove()">✕</button></div><div class="seg">${Object.entries(AYUDA).map(([k, v]) => `<button class="${ayudaK === k ? 'on' : ''}" onclick="ayuda('${k}')">${v[0]}</button>`).join('')}</div><div class="ayb">${AYUDA[ayudaK][1]}</div><p class="mini">El instructivo de administración se entrega por separado a la Mesa de Inglés.</p></div>`; }
