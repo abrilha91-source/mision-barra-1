@@ -1,6 +1,6 @@
 'use strict';
 /* Misión: Obtener la Barra I — versión PWA (sin servidor). Datos solo en este dispositivo. */
-const VER = '2.1';
+const VER = '2.2';
 const SECRET = 'REMOVED-OLD-SECRET';
 const ORIGEN = { admin: 'REDACTED', planta: 'REDACTED', cadete: 'REDACTED' };
 const METAS = { 1: 42, 2: 48, 3: 54, 4: 60 };
@@ -42,7 +42,7 @@ const POOL_L = () => BANCO.filter(b => b.lis), POOL_R = () => BANCO.filter(b => 
 function forma(letra, nq = 100, semilla = '') {
   const r = rng('forma' + letra), half = Math.floor(nq / 2);
   const L = shuffle(POOL_L(), r).slice(0, Math.min(half - 8, POOL_L().length)).map(b => b.id);
-  let g = 0; while (L.length < half) L.push('lin' + (FORMAS.indexOf(letra) * 100 + (g++)));
+  let g = 0; while (L.length < half) L.push('lin' + ((FORMAS.indexOf(letra) * 12 + (g++)) % 200));
   const R = shuffle(POOL_R(), r).slice(0, nq - half).map(b => b.id);
   let ids = L.concat(R); if (semilla) { const rr = rng(semilla); ids = shuffle(L, rr).concat(shuffle(R, rr)); }
   return ids;
@@ -90,6 +90,27 @@ function payload(p) {
 function codigoAvance(p) { const j = b64e(JSON.stringify(payload(p))); return `MB1.${j}.${b32(hash(SECRET + '|AV|' + j), 6)}`; }
 function leerCodigos(txt) { let ok = [], bad = 0; const re = /MB1\.([A-Za-z0-9_-]+)\.?([2-9A-Z]{0,6})/g; let m; while ((m = re.exec(txt))) { try { if (m[2].length !== 6 || b32(hash(SECRET + '|AV|' + m[1]), 6) !== m[2]) throw 0; const o = JSON.parse(b64d(m[1])); if (!o.m) throw 0; ok.push(o); } catch (e) { bad++; } } return { ok, bad }; }
 
+/* ---------- servidor de intranet (opcional) ---------- */
+let SRV = false, CLAVE = sessionStorage.getItem('mb1_k') || '';
+const EQUIPO = localStorage.getItem('mb1_eq') || (() => { const e = 'EQ-' + b32(hash(String(Math.random()) + Date.now()), 5); localStorage.setItem('mb1_eq', e); return e; })();
+const tsLocal = (d = new Date()) => `${hoy(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+async function api(path, data, method) { const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000);
+  try { const r = await fetch(path, { method: method || (data ? 'POST' : 'GET'), headers: { 'Content-Type': 'application/json', 'X-Clave': CLAVE }, body: data ? JSON.stringify(data) : undefined, signal: ctl.signal, cache: 'no-store' }); const j = await r.json().catch(() => ({})); if (!r.ok && r.status !== 403) throw new Error(j.error || r.status); return j; } finally { clearTimeout(t); } }
+function enviar(path, data) { if (!SRV || esPiloto()) return; api(path, data).catch(() => { S.cola = S.cola || []; S.cola.push([path, data]); if (S.cola.length > 2000) S.cola.shift(); save(); }); }
+async function vaciarCola() { const c = S.cola || []; if (!SRV || !c.length) return; S.cola = []; save(); for (const [p, d] of c) { try { await api(p, d); } catch (e) { S.cola.push([p, d]); } } save(); }
+async function detectar() { if (!location.protocol.startsWith('http') || /github\.io$/.test(location.hostname)) return; try { const r = await api('api/ping'); SRV = !!(r && r.servidor); } catch (e) { SRV = false; } if (SRV) { document.body.classList.add('srv'); vaciarCola(); setInterval(vaciarCola, 60000); if (S.sesion && S.sesion.perfil === 'admin') cargarServidor(); else render(); } }
+function actividad(q, tipo, tema, dur) { const p = P(); if (!p || p.piloto || !SRV) return; const ok = q.items.filter((x, i) => q.resp[i] === 0).length, n = Object.keys(q.resp).length;
+  enviar('api/actividad', { ts: tsLocal(), m: p.m, nombre: p.nombre, perfil: p.perfil, anio: p.anio, gp: p.gp, gi: p.gi, tipo, tema, preguntas: n, aciertos: ok, duracion_s: Math.round(dur / 1000), equipo: EQUIPO }); enviar('api/avance', payload(p)); }
+const nomModo = m => m.startsWith('tema:') ? 'Práctica por tema' : m.startsWith('forma:') ? 'Forma completa ' + m.slice(6) : m === 'nivel' ? 'Descubre tu nivel' : ({ oficial: 'Evaluación oficial' }[m] || NOMT[m] || m);
+const temaModo = (m, q) => m.startsWith('tema:') ? TEMAS[m.slice(5)] : [...new Set(q.items.map(x => TEMAS[x.it.t]))].length === 1 ? TEMAS[q.items[0].it.t] : 'Mixto';
+let SRVDATA = { act: [], ing: [], t: 0 };
+async function cargarServidor() { if (!SRV) return; try { const [av, rs, pa] = await Promise.all([api('api/avances'), api('api/resultados'), api('api/pases')]);
+  if (Array.isArray(av)) av.forEach(o => { if (o.m !== PILOTO.m && (!S.avances[o.m] || S.avances[o.m].ts <= o.ts)) S.avances[o.m] = o; });
+  if (Array.isArray(rs)) rs.forEach(r => { if (!S.registro.some(x => x.m === r.m && x.code === r.code)) S.registro.push({ n: r.nombre, m: r.m, tipo: r.tipo, anio: +r.anio || r.anio, gp: r.gp, gi: r.gi, code: r.code, pts: r.pts, sal: r.sal, folio: r.folio, fecha: r.fecha, fuente: 'servidor', valido: folio(r.m, r.code, r.pts, r.sal) === r.folio }); });
+  if (Array.isArray(pa)) pa.forEach(x => { const i = S.pases.findIndex(y => y.code === x.code); const o = { n: x.n, m: x.m, F: x.F, min: x.min, hh: x.hh, code: x.code, dia: x.dia, off: !!x.off }; i >= 0 ? S.pases[i] = o : S.pases.push(o); });
+  save(); await cargarActividad(); } catch (e) { toast('No se pudo leer el servidor: ' + e.message); } render(); }
+async function cargarActividad() { const q = new URLSearchParams(); if (af.desde) q.set('desde', af.desde); if (af.hasta) q.set('hasta', af.hasta); const [a, i] = await Promise.all([api('api/actividad?' + q), api('api/ingresos?' + q)]); SRVDATA = { act: Array.isArray(a) ? a : [], ing: Array.isArray(i) ? i : [], t: Date.now() }; }
+
 /* ---------- arranque / login ---------- */
 function render() { document.body.dataset.tema = S.tema; const app = $('#app'); if (!S.sesion) return app.innerHTML = vLogin(); if (S.sesion.perfil === 'admin') return app.innerHTML = vMando(); if (!P()) { S.sesion = null; return render(); } app.innerHTML = vUsuario(); }
 let loginPerfil = 'cadete';
@@ -106,10 +127,13 @@ function vLogin() {
   <div class="row"><button class="btn ghost" style="flex:1" onclick="ayuda()">Instructivos</button><button class="btn ghost" style="flex:1" onclick="entrarPiloto()">Usuario piloto</button></div>
   <p class="mini">Tus datos se guardan solo en este dispositivo. Funciona sin internet una vez abierta.</p></div>`;
 }
+let srvOk = false;
 function entrar() {
   const nombre = $('#lnom').value.trim(), m = norm($('#lmat').value), cod = norm($('#lcod').value);
   if (!nombre || !m) return toast('Escribe nombre y matrícula.');
-  if (cod !== norm(S.codes[loginPerfil])) return toast('Código de acceso incorrecto.');
+  if (SRV && !srvOk) { const ex = loginPerfil === 'cadete' ? { anio: $('#lanio').value, gp: norm($('#lgp').value), gi: norm($('#lgi').value), cia: $('#lcia').value.trim() } : {};
+    api('api/login', Object.assign({ perfil: loginPerfil, nombre, m, codigo: cod, equipo: EQUIPO }, ex)).then(r => { if (!r.ok) return toast(r.error || 'Código de acceso incorrecto.'); if (loginPerfil === 'admin') { CLAVE = cod; sessionStorage.setItem('mb1_k', cod); if (r.codes) S.codes = r.codes; } srvOk = true; entrar(); srvOk = false; if (loginPerfil === 'admin') cargarServidor(); }).catch(() => { SRV = false; entrar(); }); return; }
+  if (!srvOk && cod !== norm(S.codes[loginPerfil])) return toast('Código de acceso incorrecto.');
   S.sesion = { perfil: loginPerfil, nombre, m };
   if (loginPerfil !== 'admin') {
     const extra = loginPerfil === 'cadete' ? { anio: +$('#lanio').value, gp: norm($('#lgp').value), gi: norm($('#lgi').value), cia: $('#lcia').value.trim() } : { anio: 0 };
@@ -206,13 +230,18 @@ function ponerSombra() { const n = $('#snom').value.trim(), m = norm($('#smat').
 function importComps() { const { ok, bad } = leerCodigos($('#compin').value), p = P(); ok.forEach(o => { if (!p.comps[o.m] || p.comps[o.m].ts < o.ts) p.comps[o.m] = { n: o.n, m: o.m, a: o.a, gp: o.gp, cia: o.cia, ts: o.ts, w: o.w }; }); save(); render(); toast(`${ok.length} agregado(s)${bad ? ', ' + bad + ' rechazado(s)' : ''}`); }
 function paseActivo() { const a = S.pase; if (!a || !S.sesion || a.m !== S.sesion.m) return null; if (a.dia !== hoy() || new Date().getHours() >= a.hh) return null; return a; }
 function cardPase() { const a = paseActivo(); return `<section class="card"><h3>¿Te habilitaron como aplicador?</h3>${a ? `<p>Pase activo: forma <b>${a.F}</b>, ${a.min} min, hasta las ${pad(a.hh)}:00. <button class="btn sm" onclick="tab='aplicar';render()">Ir a Aplicar</button></p>` : `<div class="row"><input id="pasein" placeholder="B70-1031-14-K3Q9" autocapitalize="characters"><button class="btn" onclick="activarPase()">Activar</button></div>`}</section>`; }
-function activarPase() { const r = validaPase($('#pasein').value, S.sesion.m); if (typeof r === 'string') return toast(r); S.pase = Object.assign(r, { m: S.sesion.m }); save(); tab = 'aplicar'; render(); toast('Pase activado'); }
+function activarPase() { const r = validaPase($('#pasein').value, S.sesion.m); if (typeof r === 'string') return toast(r);
+  if (SRV && !activarPase._ok) { api('api/pase?code=' + encodeURIComponent(r.code)).then(x => { if (x.off) return toast('La Mesa de Inglés desactivó este pase.'); activarPase._ok = true; activarPase(); activarPase._ok = false; }).catch(() => { activarPase._ok = true; activarPase(); activarPase._ok = false; }); return; } S.pase = Object.assign(r, { m: S.sesion.m }); save(); tab = 'aplicar'; render(); toast('Pase activado'); }
 function vAplicar() { const a = paseActivo(); if (!a) return '<section class="card"><p>Sin pase activo.</p></section>'; const c = codigoEval(a.F, a.min); return `<section class="card center"><h3>Código del examen</h3><div class="bigcode">${c}</div><p class="mini">Forma ${a.F} · ${a.min} min · ${DUR_Q[a.min]} preguntas · válido hoy</p><button class="btn ghost" onclick="copiar('${c}')">Copiar</button></section>
   <section class="card"><h3>Resultados de la forma ${a.F} en este equipo</h3>${tablaRes(S.resultados.filter(r => r.code === c), true)}</section>${vVerificar()}`; }
 
 /* ---------- motor de preguntas ---------- */
 let Q = null;
-function hablar(t, rate = .9) { if (!('speechSynthesis' in window)) return toast('Este navegador no tiene voz en inglés.'); speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'en-US'; u.rate = rate; const vs = speechSynthesis.getVoices(); const v = vs.find(v => /^en[-_]US/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)); if (v) u.voice = v; speechSynthesis.speak(u); }
+const akey = t => b32(hash(String(t).trim()), 8);
+let AUD = null;
+function hablarVoz(t, rate) { if (!('speechSynthesis' in window)) return toast('No hay audio para esta pregunta en este equipo.'); speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'en-US'; u.rate = rate; const vs = speechSynthesis.getVoices(); const v = vs.find(v => /^en[-_]US/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)); if (v) u.voice = v; speechSynthesis.speak(u); }
+function hablar(t, rate = .9) { const k = akey(t); if (AUD) { AUD.pause(); AUD = null; } window.speechSynthesis && speechSynthesis.cancel();
+  if (window.AUDIOS && window.AUDIOS[k]) { AUD = new Audio('audio/' + k + '.mp3'); AUD.playbackRate = rate < .8 ? .72 : 1; AUD.play().catch(() => hablarVoz(t, rate)); return; } hablarVoz(t, rate); }
 function iniciar(modo) {
   const p = P(); let ids, opt = { modo, fb: true, tiempo: 0 };
   const all = BANCO.map(b => b.id);
@@ -220,9 +249,9 @@ function iniciar(modo) {
   else if (modo === 'nivel') { const r = rng('nivel' + p.m); ids = shuffle(POOL_L(), r).slice(0, 4).map(b => b.id).concat(shuffle(POOL_R(), r).slice(0, 8).map(b => b.id)); }
   else if (modo === 'errores') ids = shuffle(Object.keys(p.err)).slice(0, 10);
   else if (modo === 'mixta') ids = shuffle(all).slice(0, 15);
-  else if (modo === 'listening') ids = shuffle(POOL_L().map(b => b.id).concat(['lin' + Math.floor(Math.random() * 99999)])).slice(0, 5);
+  else if (modo === 'listening') ids = shuffle(POOL_L().map(b => b.id).concat(['lin' + Math.floor(Math.random() * 200)])).slice(0, 5);
   else if (modo === 'debil') ids = shuffle(BANCO.filter(b => b.t === temaDebil(p)).map(b => b.id)).slice(0, 10);
-  else if (modo.startsWith('tema:')) { const t = modo.slice(5); ids = t === 'lin' ? Array.from({ length: 10 }, () => 'lin' + Math.floor(Math.random() * 99999)) : shuffle(BANCO.filter(b => b.t === t).map(b => b.id)).slice(0, 10); }
+  else if (modo.startsWith('tema:')) { const t = modo.slice(5); ids = t === 'lin' ? Array.from({ length: 10 }, () => 'lin' + Math.floor(Math.random() * 200)) : shuffle(BANCO.filter(b => b.t === t).map(b => b.id)).slice(0, 10); }
   else if (modo === 'corto') { ids = shuffle(POOL_L()).slice(0, 10).map(b => b.id).concat(shuffle(POOL_R()).slice(0, 10).map(b => b.id)); Object.assign(opt, { tiempo: 15, fb: false, revision: true }); }
   else if (modo.startsWith('forma:')) { ids = forma(modo.slice(6), 100); Object.assign(opt, { tiempo: 70, fb: false, revision: true, F: modo.slice(6) }); }
   if (modo === 'mision') p.tools['mision:' + hoy()] = 1;
@@ -255,33 +284,34 @@ function pintarQ() {
 }
 function play() { const pl = Q.plays[Q.i] || 0; if (Q.oficial && pl >= 2) return; Q.plays[Q.i] = pl + 1; hablar(Q.items[Q.i].it.au); if (Q.oficial) pintarQ(); }
 function responder(o) { if (Q.fb && Q.resp[Q.i] != null) return; Q.resp[Q.i] = o; if (Q.fb) { registrar(P(), Q.items[Q.i].it, o === 0); save(); } pintarQ(); if (!Q.fb && Q.i < Q.items.length - 1) setTimeout(() => { if (Q) mover(1); }, 220); }
-function mover(d) { Q.i = Math.max(0, Math.min(Q.items.length - 1, Q.i + d)); window.speechSynthesis && speechSynthesis.cancel(); pintarQ(); }
-function limpiarQ() { clearInterval(Q.timer); window.removeEventListener('blur', salida); document.removeEventListener('visibilitychange', visib); document.removeEventListener('fullscreenchange', fsch); if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); window.speechSynthesis && speechSynthesis.cancel(); }
-function abandonar() { if (Q.oficial) { if (!confirm('Salir entrega la evaluación tal como está. ¿Entregar?')) return; return terminar(); } if (Object.keys(Q.resp).length && !Q.fb && !confirm('¿Salir sin entregar?')) return; limpiarQ(); Q = null; render(); }
+function mover(d) { Q.i = Math.max(0, Math.min(Q.items.length - 1, Q.i + d)); window.speechSynthesis && speechSynthesis.cancel(); if (AUD) AUD.pause(); pintarQ(); }
+function limpiarQ() { clearInterval(Q.timer); window.removeEventListener('blur', salida); document.removeEventListener('visibilitychange', visib); document.removeEventListener('fullscreenchange', fsch); if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); window.speechSynthesis && speechSynthesis.cancel(); if (AUD) AUD.pause(); }
+function abandonar() { if (Q.oficial) { if (!confirm('Salir entrega la evaluación tal como está. ¿Entregar?')) return; return terminar(); } if (Object.keys(Q.resp).length && !Q.fb && !confirm('¿Salir sin entregar?')) return; limpiarQ(); if (Q.fb && Object.keys(Q.resp).length) actividad(Q, nomModo(Q.modo) + ' (incompleta)', temaModo(Q.modo, Q), Date.now() - Q.ini); Q = null; render(); }
 function terminar() {
   const q = Q, of = q.oficial; q.oficial = false; limpiarQ(); const p = P(); let ok = 0;
   q.items.forEach((x, i) => { const r = q.resp[i] === 0; if (r) ok++; if (!q.fb && !of) registrar(p, x.it, r); });
   const pts = Math.round(100 * ok / q.items.length); let extra = '';
-  if (of) { const fo = folio(p.m, q.code, pts, q.sal); S.resultados.push({ n: p.nombre, m: p.m, tipo: p.piloto ? 'Piloto' : p.perfil, anio: p.anio, gp: p.gp, gi: p.gi, code: q.code, F: q.F, pts, sal: q.sal, folio: fo, fecha: hoy(), hora: new Date().toTimeString().slice(0, 5) });
+  if (of) { const fo = folio(p.m, q.code, pts, q.sal); S.resultados.push({ n: p.nombre, m: p.m, tipo: p.piloto ? 'Piloto' : p.perfil, anio: p.anio, gp: p.gp, gi: p.gi, code: q.code, F: q.F, pts, sal: q.sal, folio: fo, fecha: hoy(), hora: new Date().toTimeString().slice(0, 5) }); enviar('api/resultado', Object.assign({ equipo: EQUIPO }, S.resultados[S.resultados.length - 1]));
     extra = `<div class="bigcode" id="fpts">${pts}</div><p>Puntaje</p><div class="bigcode sm mono" id="ffolio">${fo}</div><p>Folio · Salidas: ${q.sal}</p><p class="mini">Muestra esta pantalla al aplicador. Las respuestas correctas no se muestran para proteger las preguntas.</p>`; }
   else { if (q.F) { p.formas = p.formas || {}; p.formas[q.F] = pts; } extra = `<div class="bigcode">${ok}/${q.items.length}</div><p>${pts}% de aciertos</p>`; }
-  save(); Q = null;
+  actividad(q, nomModo(q.modo), temaModo(q.modo, q), Date.now() - q.ini); save(); Q = null;
   const rev = q.revision ? `<section class="card"><h3>Revisión</h3>${q.items.map((x, i) => q.resp[i] === 0 ? '' : `<div class="rev"><small>${i + 1}. ${TEMAS[x.it.t]}</small><p>${esc(x.it.q || x.it.au)}</p><p class="okt">✔ ${esc(x.it.o[0])}</p>${q.resp[i] != null ? `<p class="badt">✘ ${esc(x.it.o[q.resp[i]])}</p>` : '<p class="mini">Sin responder</p>'}</div>`).join('') || '<p>¡Todo correcto!</p>'}</section>` : '';
   $('#app').innerHTML = `<main class="fin"><section class="card center"><h2>${of ? 'Evaluación entregada' : '¡Misión cumplida!'}</h2>${extra}<button class="btn big" onclick="render()">Continuar</button></section>${rev}</main>`;
 }
 function tarjetasPendientes(p) { const now = Date.now(); const ids = BANCO.filter(b => b.t === 'voc').map(b => b.id).concat(Object.keys(p.err).filter(i => !i.startsWith('lin'))); return [...new Set(ids)].filter(id => !p.cards[id] || p.cards[id].due <= now).slice(0, 12); }
 let TC = null;
-function iniciarTarjetas() { const ids = tarjetasPendientes(P()); if (!ids.length) return toast('No tienes tarjetas pendientes hoy.'); usar('tarjetas'); TC = { ids, i: 0, ver: false }; pintarT(); }
-function pintarT() { if (TC.i >= TC.ids.length) { TC = null; toast('Tarjetas terminadas'); return render(); } const it = byId(TC.ids[TC.i]);
+let TC0 = 0;
+function iniciarTarjetas() { TC0 = Date.now(); const ids = tarjetasPendientes(P()); if (!ids.length) return toast('No tienes tarjetas pendientes hoy.'); usar('tarjetas'); TC = { ids, i: 0, ver: false }; pintarT(); }
+function pintarT() { if (TC.i >= TC.ids.length) { const p = P(); if (SRV && p && !p.piloto) enviar('api/actividad', { ts: tsLocal(), m: p.m, nombre: p.nombre, perfil: p.perfil, anio: p.anio, gp: p.gp, gi: p.gi, tipo: 'Tarjetas', tema: 'Repaso', preguntas: TC.ids.length, aciertos: TC.ok || 0, duracion_s: Math.round((Date.now() - TC0) / 1000), equipo: EQUIPO }); TC = null; toast('Tarjetas terminadas'); return render(); } const it = byId(TC.ids[TC.i]);
   $('#app').innerHTML = `<div class="quiz"><header><button class="ico" onclick="TC=null;render()">✕</button><div class="prog"><i style="width:${100 * TC.i / TC.ids.length}%"></i></div><span>${TC.i + 1}/${TC.ids.length}</span></header><main><div class="flash" onclick="TC.ver=true;pintarT()">${it.pas ? `<small>${esc(it.pas.slice(0, 140))}…</small>` : ''}<p>${esc(it.q || it.au)}</p>${TC.ver ? `<h2>${esc(it.o[0])}</h2>` : '<span class="mini">Toca para ver la respuesta</span>'}</div>
   ${it.lis ? `<button class="btn ghost" onclick="hablar(byId(TC.ids[TC.i]).au)">▶ Escuchar</button>` : ''}${TC.ver ? `<div class="row"><button class="btn ghost" onclick="calif(0)">Repasar mañana</button><button class="btn" onclick="calif(1)">Lo sabía</button></div>` : ''}</main></div>`; }
-function calif(ok) { const p = P(), id = TC.ids[TC.i], c = p.cards[id] || { box: 0 }; c.box = ok ? Math.min(5, c.box + 1) : 0; c.due = Date.now() + [1, 1, 3, 7, 14, 30][c.box] * 864e5 - 36e5; p.cards[id] = c; save(); TC.i++; TC.ver = false; pintarT(); }
+function calif(ok) { const p = P(), id = TC.ids[TC.i], c = p.cards[id] || { box: 0 }; c.box = ok ? Math.min(5, c.box + 1) : 0; c.due = Date.now() + [1, 1, 3, 7, 14, 30][c.box] * 864e5 - 36e5; p.cards[id] = c; if (ok) TC.ok = (TC.ok || 0) + 1; save(); TC.i++; TC.ver = false; pintarT(); }
 
 /* ---------- Centro de mando ---------- */
 let fil = { anio: '', gp: '', gi: '', dia: '' }, grupoPor = 'gp';
 function vMando() {
-  const tabs = [['mando', 'Mando'], ['avance', 'Avance'], ['antig', 'Antigüedad'], ['estad', 'Estadística'], ['areas', 'Áreas'], ['riesgo', 'En riesgo'], ['eval', 'Evaluación'], ['aplic', 'Aplicadores'], ['ajustes', 'Ajustes']];
-  const body = { avance: mAvance, antig: mAntig, estad: mEstad, areas: mAreas, riesgo: mRiesgo, eval: mEval, aplic: mAplic, ajustes: mAjustes, mando: mMando }[tab] || mAvance;
+  const tabs = [['mando', 'Mando'], ['avance', 'Avance'], ['antig', 'Antigüedad'], ['estad', 'Estadística'], ['areas', 'Áreas'], ['riesgo', 'En riesgo'], ['eval', 'Evaluación'], ['aplic', 'Aplicadores'], ['actividad', 'Actividad'], ['ajustes', 'Ajustes']];
+  const body = { actividad: mActividad, avance: mAvance, antig: mAntig, estad: mEstad, areas: mAreas, riesgo: mRiesgo, eval: mEval, aplic: mAplic, ajustes: mAjustes, mando: mMando }[tab] || mAvance;
   return `<header><div><b>Centro de mando</b><span>${esc(S.sesion.nombre)} · Administración</span></div><button class="ico" onclick="ayuda()" title="Instructivos">?</button><button class="ico" onclick="tema()" title="Tema">◐</button><button class="ico" onclick="salir()" title="Cerrar sesión">⎋</button></header>
   <nav class="tabs">${tabs.map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-tab="${k}" onclick="tab='${k}';render()">${l}</button>`).join('')}</nav><main class="wide">${body()}</main>`;
 }
@@ -352,13 +382,15 @@ function mEval() { const c = codigoEval(evF, evMin), R = todosRes();
   ${R.length ? `<div class="tw"><table><tr><th>Evaluado</th><th>Tipo</th><th>Matrícula</th><th>Forma</th><th>Fecha</th><th>Puntaje</th><th>Salidas</th><th>Folio</th><th>Fuente</th></tr>${R.slice().reverse().map(r => `<tr><td>${esc(r.n)}</td><td>${r.tipo === 'Piloto' ? '<span class="tagp">Piloto</span>' : r.tipo}</td><td>${esc(r.m)}</td><td>${r.code}</td><td>${r.fecha}</td><td><b>${r.pts}</b></td><td>${r.sal}</td><td class="mono ${r.valido ? '' : 'badt'}">${r.folio}${r.valido ? '' : ' ⚠'}</td><td><small>${r.fuente}</small></td></tr>`).join('')}</table></div>` : '<p class="mini">Sin resultados.</p>'}</section>${vVerificar()}`; }
 function mAplic() { const now = new Date(), hs = []; for (let h = now.getHours() + 1; h <= 23; h++) hs.push(h);
   return `<section class="card"><h3>Emitir pase de aplicador</h3><div class="g2"><input id="apn" placeholder="Grado y nombre del docente"><input id="apm" placeholder="Matrícula del docente"></div><div class="g3"><label>Forma<select id="apf">${FORMAS.map(f => `<option>${f}</option>`).join('')}</select></label><label>Duración<select id="apd">${[70, 60, 45, 30].map(m => `<option>${m}</option>`).join('')}</select></label><label>Válido hoy hasta<select id="aph">${hs.map(h => `<option value="${h}" ${h === Math.min(23, now.getHours() + 3) ? 'selected' : ''}>${pad(h)}:00</option>`).join('')}</select></label></div>${hs.length ? '<button class="btn" id="btnpase" onclick="emitirPase()">Generar pase</button>' : '<p class="mini">Ya no quedan horas hoy para emitir pases.</p>'}<div id="apout"></div></section>
-  <section class="card"><h3>Pases emitidos en este equipo</h3>${S.pases.length ? `<div class="tw"><table><tr><th>Docente</th><th>Matrícula</th><th>Pase</th><th>Estado</th><th></th></tr>${S.pases.map((p, i) => [p, i]).reverse().map(([p, i]) => { const st = p.off ? 'Desactivado' : (p.dia !== hoy() || now.getHours() >= p.hh) ? 'Vencido' : 'Activo'; return `<tr><td>${esc(p.n)}</td><td>${esc(p.m)}</td><td class="mono">${p.code}</td><td class="${st === 'Activo' ? 'okt' : 'mini'}">${st}</td><td>${st === 'Activo' ? `<button class="btn sm ghost" onclick="S.pases[${i}].off=true;save();render()">Desactivar</button>` : ''}</td></tr>`; }).join('')}</table></div>` : '<p class="mini">Ninguno.</p>'}<p class="mini">Sin servidor, desactivar solo surte efecto en este equipo; en el del docente el pase vence a la hora indicada.</p></section>`; }
-function emitirPase() { const n = $('#apn').value.trim(), m = norm($('#apm').value); if (!n || !m) return toast('Grado, nombre y matrícula del docente.'); const F = $('#apf').value, min = +$('#apd').value, hh = +$('#aph').value, code = generaPase(m, F, min, hh); S.pases.push({ n, m, F, min, hh, code, dia: hoy() }); save(); render(); $('#apout').innerHTML = `<div class="bigcode sm mono" id="pasecode">${code}</div><button class="btn ghost" onclick="copiar('${code}')">Copiar</button>`; }
+  <section class="card"><h3>Pases emitidos en este equipo</h3>${S.pases.length ? `<div class="tw"><table><tr><th>Docente</th><th>Matrícula</th><th>Pase</th><th>Estado</th><th></th></tr>${S.pases.map((p, i) => [p, i]).reverse().map(([p, i]) => { const st = p.off ? 'Desactivado' : (p.dia !== hoy() || now.getHours() >= p.hh) ? 'Vencido' : 'Activo'; return `<tr><td>${esc(p.n)}</td><td>${esc(p.m)}</td><td class="mono">${p.code}</td><td class="${st === 'Activo' ? 'okt' : 'mini'}">${st}</td><td>${st === 'Activo' ? `<button class="btn sm ghost" onclick="desPase(${i})">Desactivar</button>` : ''}</td></tr>`; }).join('')}</table></div>` : '<p class="mini">Ninguno.</p>'}<p class="mini">${SRV ? 'Con servidor: desactivar aplica en todos los equipos al activar o abrir Aplicar.' : 'Sin servidor, desactivar solo surte efecto en este equipo; en el del docente el pase vence a la hora indicada.'}</p></section>`; }
+function desPase(i) { S.pases[i].off = true; enviar('api/pases', S.pases[i]); save(); render(); }
+function emitirPase() { const n = $('#apn').value.trim(), m = norm($('#apm').value); if (!n || !m) return toast('Grado, nombre y matrícula del docente.'); const F = $('#apf').value, min = +$('#apd').value, hh = +$('#aph').value, code = generaPase(m, F, min, hh); S.pases.push({ n, m, F, min, hh, code, dia: hoy() }); enviar('api/pases', S.pases[S.pases.length - 1]); save(); render(); $('#apout').innerHTML = `<div class="bigcode sm mono" id="pasecode">${code}</div><button class="btn ghost" onclick="copiar('${code}')">Copiar</button>`; }
 function mAjustes() { return `<section class="card"><h3>Cambio de códigos de acceso</h3><p class="mini">Escribe solo los que vas a cambiar. 6 a 24 caracteres: letras sin acento, números o guiones. Sin servidor, aplica solo en este equipo.</p>
   <label>Cadetes<input id="kc" placeholder="${esc(S.codes.cadete)}"></label><label>Planta<input id="kp" placeholder="${esc(S.codes.planta)}"></label><label>Administración<input id="ka" placeholder="••••••"></label><div class="row"><button class="btn" onclick="guardarCodigos()">Guardar cambios</button><button class="btn ghost" onclick="if(confirm('¿Volver a los códigos de origen?')){S.codes={...ORIGEN};save();toast('Códigos de origen restaurados')}">Restaurar origen</button></div></section>
   <section class="card"><h3>Respaldo</h3><p class="mini">Guarda todo (avances, padrón, resultados, pases y ajustes) en un archivo JSON. Úsalo para pasar los datos a otro equipo o a la computadora de la Mesa.</p><div class="row"><button class="btn" onclick="respaldo()">Descargar respaldo</button><label class="btn ghost">Restaurar respaldo<input type="file" hidden accept=".json,application/json" onchange="restaurar(this)"></label></div></section>
-  <section class="card"><h3>Este dispositivo</h3><p class="mini">Versión ${VER} · ${BANCO.length} preguntas fijas + listening generado · ${navigator.onLine ? 'en línea' : 'sin internet'} · ${'serviceWorker' in navigator && navigator.serviceWorker.controller ? 'lista para usarse sin internet ✔' : 'ábrela una vez con internet para usarla sin conexión'}</p></section>`; }
-function guardarCodigos() { const ch = { cadete: $('#kc').value, planta: $('#kp').value, admin: $('#ka').value }; let n = 0; for (const k in ch) { const v = ch[k].trim(); if (v && !/^[A-Za-z0-9-]{6,24}$/.test(v)) return toast(`Código de ${k} no válido (6 a 24: letras sin acento, números o guiones).`); } for (const k in ch) { const v = ch[k].trim(); if (v) { S.codes[k] = v.toUpperCase(); n++; } } if (!n) return toast('No escribiste ningún código nuevo.'); save(); render(); toast('Códigos actualizados'); }
+  <section class="card"><h3>Este dispositivo</h3><p class="mini">Versión ${VER} · ${BANCO.length} preguntas fijas + listening generado · ${navigator.onLine ? 'en línea' : 'sin internet'} · ${'serviceWorker' in navigator && navigator.serviceWorker.controller ? 'lista para usarse sin internet ✔' : 'ábrela una vez con internet para usarla sin conexión'} · ${SRV ? '<b class="okt">Servidor de intranet conectado</b>' : 'sin servidor'} · ${Object.keys(window.AUDIOS || {}).length} audios grabados · equipo ${EQUIPO}${(S.cola || []).length ? ' · ' + S.cola.length + ' envío(s) pendientes' : ''}</p></section>`; }
+function guardarCodigos() { const ch = { cadete: $('#kc').value, planta: $('#kp').value, admin: $('#ka').value }; let n = 0; for (const k in ch) { const v = ch[k].trim(); if (v && !/^[A-Za-z0-9-]{6,24}$/.test(v)) return toast(`Código de ${k} no válido (6 a 24: letras sin acento, números o guiones).`); } for (const k in ch) { const v = ch[k].trim(); if (v) { S.codes[k] = v.toUpperCase(); n++; } } if (!n) return toast('No escribiste ningún código nuevo.'); save(); render();
+  if (SRV) api('api/codigos', ch).then(r => { if (r.ok) { if (ch.admin.trim()) { CLAVE = ch.admin.trim().toUpperCase(); sessionStorage.setItem('mb1_k', CLAVE); } toast('Códigos actualizados en todos los equipos'); } else toast(r.error || 'El servidor no aceptó el cambio.'); }).catch(() => toast('Códigos actualizados solo en este equipo (sin servidor).')); else toast('Códigos actualizados'); }
 function mMando() { const L = AV(), R = riesgos(), Rs = todosRes().filter(r => r.tipo !== 'Piloto'), hoyAct = L.filter(a => a.dias && a.dias[hoy()]).length;
   return `<section class="kpis"><div><b>${L.length}${S.padron.length ? '/' + S.padron.length : ''}</b><span>Con avance${S.padron.length ? ' / padrón' : ''}</span></div><div><b>${hoyAct}</b><span>Practicaron hoy</span></div><div><b class="badt">${R.length}</b><span>En riesgo</span></div><div><b>${Rs.length}</b><span>Evaluaciones</span></div></section>
   <section class="card"><h3>Metas de egreso</h3><div class="tw"><table><tr><th>Año</th><th>Meta</th><th>Promedio actual</th><th>Faltan</th></tr>${[1, 2, 3, 4].map(y => { const c = prom(L.filter(a => a.a == y).map(a => a.est)); return `<tr><td>${y}° año${y === 4 ? ' (Barra I)' : ''}</td><td>${METAS[y]}</td><td>${c ?? '—'}</td><td>${c != null ? Math.max(0, METAS[y] - c) : '—'}</td></tr>`; }).join('')}</table></div></section>
@@ -384,7 +416,7 @@ function restaurar(inp) { const f = inp.files[0]; if (!f) return; f.text().then(
 window.addEventListener('popstate', () => { if (Q && Q.oficial) { history.pushState({ q: 1 }, ''); salida(); } });
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js');
 if (window.speechSynthesis) speechSynthesis.getVoices();
-window.__mb1 = { S: () => S, codigoEval, generaPase, validaPase, folio, codigoAvance, leerCodigos, forma, BANCO, importar, iniciar, P };
+window.__mb1 = { byId, akey, S: () => S, codigoEval, generaPase, validaPase, folio, codigoAvance, leerCodigos, forma, BANCO, importar, iniciar, P };
 render();
 
 /* ---------- modo presentación (usuario piloto) ---------- */
@@ -420,3 +452,23 @@ const AYUDA = {
 let ayudaK = 'cadete';
 function ayuda(k) { if (k) ayudaK = k; let el = $('#ayuda'); if (!el) { el = document.createElement('div'); el.id = 'ayuda'; document.body.appendChild(el); }
   el.innerHTML = `<div class="ayc"><div class="gh"><b>Instructivos</b><button onclick="$('#ayuda').remove()">✕</button></div><div class="seg">${Object.entries(AYUDA).map(([k, v]) => `<button class="${ayudaK === k ? 'on' : ''}" onclick="ayuda('${k}')">${v[0]}</button>`).join('')}</div><div class="ayb">${AYUDA[ayudaK][1]}</div><p class="mini">El instructivo de administración se entrega por separado a la Mesa de Inglés.</p></div>`; }
+
+/* ---------- Actividad (requiere servidor) ---------- */
+let af = { desde: '', hasta: '', anio: '', gp: '', txt: '', vista: 'act' };
+function mActividad() {
+  if (!SRV) return `<section class="card"><h3>Actividad</h3><p>El registro automático de ingresos y ejercicios necesita el <b>servidor de intranet</b> de la escuela. En esta versión web pública la actividad llega por los códigos de avance (pestaña Avance).</p><p class="mini">Abre la aplicación desde la dirección del servidor (por ejemplo http://10.x.x.x:8080/) para ver esta pestaña con datos.</p></section>`;
+  const f = r => (!af.anio || String(r.anio) === af.anio) && (!af.gp || norm(r.gp) === norm(af.gp)) && (!af.txt || (r.nombre + ' ' + r.m).toUpperCase().includes(norm(af.txt)));
+  const A = SRVDATA.act.filter(f), I = SRVDATA.ing.filter(f), pr = A.reduce((s, r) => s + r.preguntas, 0), ac = A.reduce((s, r) => s + r.aciertos, 0), mins = Math.round(A.reduce((s, r) => s + r.duracion_s, 0) / 60), dist = new Set(A.map(r => r.m).concat(I.map(r => r.m))).size;
+  const tabla = af.vista === 'act' ? `<table><tr><th>Fecha y hora</th><th>Nombre</th><th>Año</th><th>Grupo</th><th>Ejercicio</th><th>Tema</th><th>Preg.</th><th>Aciertos</th><th>Duración</th></tr>${A.slice(0, 500).map(r => `<tr><td>${r.ts}</td><td>${esc(r.nombre)}<small>${esc(r.m)}</small></td><td>${esc(r.anio)}</td><td>${esc(r.gp)}${r.gi ? ' / ' + esc(r.gi) : ''}</td><td>${esc(r.tipo)}</td><td>${esc(r.tema)}</td><td>${r.preguntas}</td><td>${r.aciertos}${r.preguntas ? ' (' + Math.round(100 * r.aciertos / r.preguntas) + '%)' : ''}</td><td>${Math.floor(r.duracion_s / 60)}:${pad(r.duracion_s % 60)}</td></tr>`).join('')}</table>`
+    : `<table><tr><th>Fecha y hora</th><th>Perfil</th><th>Nombre</th><th>Matrícula</th><th>Año</th><th>Grupo</th><th>Grupo inglés</th><th>Equipo</th></tr>${I.slice(0, 500).map(r => `<tr><td>${r.ts}</td><td>${r.perfil}</td><td>${esc(r.nombre)}</td><td>${esc(r.m)}</td><td>${esc(r.anio)}</td><td>${esc(r.gp)}</td><td>${esc(r.gi)}</td><td><small>${esc(r.equipo)} ${esc(r.ip)}</small></td></tr>`).join('')}</table>`;
+  return `<div class="filtros"><input type="date" value="${af.desde}" onchange="af.desde=this.value;actualizarAct()" title="Desde"><input type="date" value="${af.hasta}" onchange="af.hasta=this.value;actualizarAct()" title="Hasta">
+  <select onchange="af.anio=this.value;render()"><option value="">Todos los años</option>${[1, 2, 3, 4].map(a => `<option ${af.anio == a ? 'selected' : ''} value="${a}">${a}° año</option>`).join('')}</select><input placeholder="Grupo" value="${esc(af.gp)}" onchange="af.gp=this.value;render()"><input placeholder="Nombre o matrícula" value="${esc(af.txt)}" onchange="af.txt=this.value;render()"><button class="btn sm ghost" onclick="actualizarAct()">Actualizar</button></div>
+  <section class="kpis"><div><b>${I.length}</b><span>Ingresos</span></div><div><b>${dist}</b><span>Personas distintas</span></div><div><b>${A.length}</b><span>Ejercicios · ${pr} preguntas</span></div><div><b>${pr ? Math.round(100 * ac / pr) + '%' : '—'}</b><span>Aciertos · ${mins} min</span></div></section>
+  <section class="card"><div class="row sp"><div class="seg sm"><button class="${af.vista === 'act' ? 'on' : ''}" onclick="af.vista='act';render()">Ejercicios (${A.length})</button><button class="${af.vista === 'ing' ? 'on' : ''}" onclick="af.vista='ing';render()">Ingresos (${I.length})</button></div><button class="btn sm ghost" onclick="expAct()">Excel</button></div>
+  <div class="tw">${tabla}</div>${(af.vista === 'act' ? A : I).length > 500 ? '<p class="mini">Se muestran 500; el Excel trae todos.</p>' : ''}<p class="mini">Actualizado: ${SRVDATA.t ? new Date(SRVDATA.t).toLocaleTimeString('es-MX') : '—'}. El usuario piloto no se registra.</p></section>`; }
+function actualizarAct() { cargarActividad().then(render).catch(e => toast('No se pudo leer el servidor: ' + e.message)); }
+function expAct() { const f = r => (!af.anio || String(r.anio) === af.anio) && (!af.gp || norm(r.gp) === norm(af.gp)) && (!af.txt || (r.nombre + ' ' + r.m).toUpperCase().includes(norm(af.txt)));
+  const A = SRVDATA.act.filter(f).map(r => ({ 'Fecha y hora': r.ts, Nombre: r.nombre, Matrícula: r.m, Perfil: r.perfil, Año: r.anio, 'Grupo ped.': r.gp, 'Grupo inglés': r.gi, Ejercicio: r.tipo, Tema: r.tema, Preguntas: r.preguntas, Aciertos: r.aciertos, '% aciertos': r.preguntas ? Math.round(100 * r.aciertos / r.preguntas) : '', 'Duración (min)': Math.round(r.duracion_s / 6) / 10, Equipo: r.equipo }));
+  const I = SRVDATA.ing.filter(f).map(r => ({ 'Fecha y hora': r.ts, Perfil: r.perfil, Nombre: r.nombre, Matrícula: r.m, Año: r.anio, 'Grupo ped.': r.gp, 'Grupo inglés': r.gi, Compañía: r.cia, Equipo: r.equipo, IP: r.ip }));
+  exportar(A.length ? A : [{ Aviso: 'Sin ejercicios en el periodo' }], 'Actividad', 'xlsx', [['Ingresos', I]]); }
+detectar();
