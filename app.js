@@ -1,7 +1,9 @@
 'use strict';
 /* Misión: Obtener la Barra I — versión PWA (sin servidor). Datos solo en este dispositivo. */
-const VER = '2.3';
-const SECRET = 'REMOVED-OLD-SECRET';
+const VER = '2.3.1';
+// Firma: en el servidor de intranet la entrega /config.js (clave aleatoria por instalación, solo en la red local).
+// En la versión pública no hay clave secreta: es una suma de verificación pública (detecta errores de copia, no falsificación).
+const SECRET = window.MB1_FIRMA || 'MB1-PUBLICO-v2.3.1';
 function sha256(m){const K=[],H=[],p=n=>{for(let f=2;f*f<=n;f++)if(n%f==0)return 0;return 1};for(let n=2,i=0;i<64;n++)if(p(n)){if(i<8)H[i]=Math.pow(n,1/2)*2**32|0;K[i++]=Math.pow(n,1/3)*2**32|0}
 const b=unescape(encodeURIComponent(m)),l=b.length,w=[];for(let i=0;i<l;i++)w[i>>2]|=b.charCodeAt(i)<<(24-8*(i&3));w[l>>2]|=0x80<<(24-8*(l&3));const N=((l+8>>6)+1)*16;w[N-1]=l*8;for(let i=0;i<N;i++)w[i]|=0;
 const r=(x,n)=>x>>>n|x<<(32-n);for(let j=0;j<N;j+=16){const W=w.slice(j,j+16);let[a,b2,c,d,e,f,g,h]=H;for(let i=0;i<64;i++){if(i>15){const x=W[i-15],y=W[i-2];W[i]=(W[i-16]+(r(x,7)^r(x,18)^x>>>3)+W[i-7]+(r(y,17)^r(y,19)^y>>>10))|0}
@@ -15,7 +17,8 @@ const FORMAS = 'ABCDEFGHIJKLMNOP'.split('');
 const DUR_Q = { 70: 100, 60: 86, 45: 64, 30: 42 };
 const KEY = 'mb1_estado_v2';
 const PISTA = { tie: 'Fíjate en las palabras de tiempo (yesterday, since, every day, already, by next…): ellas deciden el tiempo verbal.', est: 'Revisa la estructura: preposición, artículo, comparativo o conector que exige la oración.', voc: 'Busca el sinónimo o el significado en contexto; descarta las opciones que cambian el sentido.', lec: 'La respuesta está en el texto: vuelve a leer la oración que contiene la palabra clave de la pregunta.', lir: 'Responde a lo que se pregunta: Where → lugar, When → tiempo, Who → persona, How long → duración.', lic: 'Escucha la idea completa, no palabras sueltas: negaciones y "but" cambian el sentido.', lin: 'Anota mentalmente el dato (hora, número, día o lugar) y fíjate si después lo cambian.', lrc: 'Escucha la terminación del verbo (-ed, -s, -ing) y las palabras pequeñas.' };
-const PILOTO = { m: 'PILOTO-EME', nombre: 'Usuario Piloto', code: 'REMOVED-OLD-CODE' };
+const PILOTO = { m: 'PILOTO-EME', nombre: 'Usuario Piloto', ch: '44727d3d5aa08c84731a7dfaad5c5402db3508c7bcf4f655a9891ad6d0f6490e' };
+let REAL = null; // estado real guardado mientras corre el piloto (el piloto vive solo en memoria)
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function hash(str, seed = 0) { let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed; for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909); return 4294967296 * (2097151 & h2) + (h1 >>> 0); }
@@ -53,10 +56,10 @@ function forma(letra, nq = 100, semilla = '') {
   let ids = L.concat(R); if (semilla) { const rr = rng(semilla); ids = shuffle(L, rr).concat(shuffle(R, rr)); }
   return ids;
 }
-let S = load(); const migraCodes = () => { S.codes = S.codes || {}; for (const k in ORIGEN) if (!esHash(S.codes[k])) S.codes[k] = ORIGEN[k]; }; migraCodes();
+let S = load(); const migraCodes = () => { S.codes = S.codes || {}; for (const k in ORIGEN) if (!esHash(S.codes[k])) S.codes[k] = ORIGEN[k]; }; migraCodes(); if (S.perfiles && S.perfiles[PILOTO.m]) { delete S.perfiles[PILOTO.m]; if (S.sesion && S.sesion.m === PILOTO.m) S.sesion = null; }
 function load() { try { return Object.assign(base(), JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { return base(); } }
 function base() { return { codes: { ...ORIGEN }, sesion: null, perfiles: {}, resultados: [], pases: [], avances: {}, padron: [], registro: [], pase: null, tema: 'claro' }; }
-function save() { localStorage.setItem(KEY, JSON.stringify(S)); }
+function save() { if (REAL) return; localStorage.setItem(KEY, JSON.stringify(S)); }
 const P = () => S.sesion && S.perfiles[S.sesion.m];
 const esPiloto = () => S.sesion && S.sesion.m === PILOTO.m;
 const xp = p => (p.xpBase || 0) + p.ans.reduce((s, a) => s + (a[1] ? 10 : 2), 0);
@@ -103,10 +106,10 @@ const tsLocal = (d = new Date()) => `${hoy(d)} ${pad(d.getHours())}:${pad(d.getM
 async function api(path, data, method) { const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000);
   try { const r = await fetch(path, { method: method || (data ? 'POST' : 'GET'), headers: { 'Content-Type': 'application/json', 'X-Clave': CLAVE }, body: data ? JSON.stringify(data) : undefined, signal: ctl.signal, cache: 'no-store' }); const j = await r.json().catch(() => ({})); if (!r.ok && r.status !== 403) throw new Error(j.error || r.status); return j; } finally { clearTimeout(t); } }
 const SHEET = (window.SHEET_URL || '').trim();
-function hojaPost(tipoRegistro, datos) { if (!SHEET) return; const d = Object.assign({}, datos); delete d.codigo; fetch(SHEET, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ tipoRegistro, datos: d }) }).catch(() => { S.colaH = S.colaH || []; S.colaH.push([tipoRegistro, d]); if (S.colaH.length > 2000) S.colaH.shift(); save(); }); }
+function hojaPost(tipoRegistro, datos) { if (!SHEET || REAL) return; const d = Object.assign({}, datos); delete d.codigo; fetch(SHEET, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ tipoRegistro, datos: d }) }).catch(() => { S.colaH = S.colaH || []; S.colaH.push([tipoRegistro, d]); if (S.colaH.length > 2000) S.colaH.shift(); save(); }); }
 function vaciarColaH() { const c = S.colaH || []; if (!SHEET || !c.length || !navigator.onLine) return; S.colaH = []; save(); c.forEach(([t, d]) => hojaPost(t, d)); }
 window.addEventListener('online', () => setTimeout(vaciarColaH, 1500)); setTimeout(vaciarColaH, 4000);
-function enviar(path, data) { if (esPiloto()) return; if (!SRV) { if (SHEET && path === 'api/actividad') hojaPost('actividad', data); return; } api(path, data).catch(() => { S.cola = S.cola || []; S.cola.push([path, data]); if (S.cola.length > 2000) S.cola.shift(); save(); }); }
+function enviar(path, data) { if (esPiloto() || REAL) return; if (!SRV) { if (SHEET && path === 'api/actividad') hojaPost('actividad', data); return; } api(path, data).catch(() => { S.cola = S.cola || []; S.cola.push([path, data]); if (S.cola.length > 2000) S.cola.shift(); save(); }); }
 async function vaciarCola() { const c = S.cola || []; if (!SRV || !c.length) return; S.cola = []; save(); for (const [p, d] of c) { try { await api(p, d); } catch (e) { S.cola.push([p, d]); } } save(); }
 async function detectar() { if (!location.protocol.startsWith('http') || /github\.io$/.test(location.hostname)) return; try { const r = await api('api/ping'); SRV = !!(r && r.servidor); } catch (e) { SRV = false; } if (SRV) { document.body.classList.add('srv'); vaciarCola(); setInterval(vaciarCola, 60000); if (S.sesion && S.sesion.perfil === 'admin') cargarServidor(); else render(); } }
 function actividad(q, tipo, tema, dur) { const p = P(); if (!p || p.piloto || !(SRV || SHEET)) return; const ok = q.items.filter((x, i) => q.resp[i] === 0).length, n = Object.keys(q.resp).length;
@@ -157,9 +160,9 @@ function entrar() {
   }
   tab = loginPerfil === 'admin' ? 'avance' : 'hoy'; save(); render();
 }
-function entrarPiloto() { const c = prompt('Código del usuario piloto (lo da la Mesa de Inglés):'); if (c == null) return; if (norm(c) !== PILOTO.code) return toast('Código de piloto incorrecto.');
-  S.perfiles[PILOTO.m] = crearPiloto(); S.sesion = { perfil: 'cadete', nombre: PILOTO.nombre, m: PILOTO.m }; tab = 'hoy'; save(); render(); if (confirm('¿Activar el modo presentación (guion paso a paso)?')) presentar(0); }
-function salir() { if (esPiloto()) { if (!confirm('¿Cerrar el usuario piloto? Su práctica de ejemplo se borra y el equipo queda en cero.')) return; delete S.perfiles[PILOTO.m]; S.sesion = null; save(); render(); return; } if (!confirm('¿Cerrar sesión? Tu avance queda guardado en este dispositivo.')) return; S.sesion = null; save(); render(); }
+function entrarPiloto() { const c = prompt('Código del usuario piloto (lo da la Mesa de Inglés):'); if (c == null) return; if (hc(norm(c)) !== PILOTO.ch) return toast('Código de piloto incorrecto.');
+  if (!REAL) { REAL = S; S = base(); S.codes = { ...REAL.codes }; S.tema = REAL.tema; } S.perfiles[PILOTO.m] = crearPiloto(); S.sesion = { perfil: 'cadete', nombre: PILOTO.nombre, m: PILOTO.m }; tab = 'hoy'; save(); render(); if (confirm('¿Activar el modo presentación (guion paso a paso)?')) presentar(0); }
+function salir() { if (esPiloto()) { if (!confirm('¿Cerrar el usuario piloto? Su práctica de ejemplo se borra y el equipo queda en cero.')) return; salirSandbox(); render(); return; } if (!confirm('¿Cerrar sesión? Tu avance queda guardado en este dispositivo.')) return; S.sesion = null; save(); render(); }
 
 let tab = 'hoy';
 function vUsuario() {
@@ -449,7 +452,8 @@ function presentar(i) { GUION_I = Math.max(0, Math.min(GUION.length - 1, i)); co
   let el = $('#guion'); if (!el) { el = document.createElement('div'); el.id = 'guion'; document.body.appendChild(el); }
   el.innerHTML = `<div class="gh"><b>Paso ${GUION_I + 1} de ${GUION.length} · ${g[1]}</b><button onclick="cerrarGuion()">✕</button></div><p>${g[2]}</p><p class="mini"><b>Ventaja:</b> ${g[3]}</p><div class="row"><button class="btn sm ghost" onclick="presentar(GUION_I-1)" ${GUION_I ? '' : 'disabled'}>Anterior</button>${g[0] === 'fin' ? `<button class="btn sm" onclick="finPiloto()">Cerrar piloto e ir a Administración</button>` : `<button class="btn sm" onclick="presentar(GUION_I+1)">Siguiente</button>`}</div>`; }
 function cerrarGuion() { GUION_I = null; $('#guion')?.remove(); }
-function finPiloto() { if (esPiloto()) { delete S.perfiles[PILOTO.m]; S.sesion = null; save(); } cerrarGuion(); loginPerfil = 'admin'; render(); toast('Piloto cerrado. Entra con la clave de administración.'); }
+function salirSandbox() { if (REAL) { S = REAL; REAL = null; } if (S.perfiles[PILOTO.m]) { delete S.perfiles[PILOTO.m]; } if (S.sesion && S.sesion.m === PILOTO.m) S.sesion = null; save(); }
+function finPiloto() { if (esPiloto() || REAL) salirSandbox(); cerrarGuion(); loginPerfil = 'admin'; render(); toast('Piloto cerrado. Entra con la clave de administración.'); }
 
 /* ---------- ayuda: instructivos por perfil ---------- */
 const AYUDA = {
