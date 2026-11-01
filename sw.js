@@ -1,4 +1,4 @@
-const C='mb1-v2.3.1';const F=['./','index.html','styles.css','app.js','bank.js','bank2.js','bank3.js','config.js','audios.js','xlsx.bundle.js','NotoSans-latin.woff2','icon.svg','icon-192.png','icon-512.png','manifest.webmanifest'];
+const C='mb1-v2.3.2';const F=['./','index.html','styles.css','app.js','bank.js','bank2.js','bank3.js','config.js','audios.js','xlsx.bundle.js','NotoSans-latin.woff2','icon.svg','icon-192.png','icon-512.png','manifest.webmanifest'];
 self.window=self;try{importScripts('audios.js')}catch(e){}
 const AU=Object.keys(self.AUDIOS||{}).map(k=>'audio/'+k+'.mp3');
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(async c=>{await c.addAll(F);for(let i=0;i<AU.length;i+=40)await Promise.all(AU.slice(i,i+40).map(u=>c.add(u).catch(()=>{})))}));self.skipWaiting()});

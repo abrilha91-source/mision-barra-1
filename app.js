@@ -1,6 +1,6 @@
 'use strict';
 /* Misión: Obtener la Barra I — versión PWA (sin servidor). Datos solo en este dispositivo. */
-const VER = '2.3.1';
+const VER = '2.3.2';
 // Firma: en el servidor de intranet la entrega /config.js (clave aleatoria por instalación, solo en la red local).
 // En la versión pública no hay clave secreta: es una suma de verificación pública (detecta errores de copia, no falsificación).
 const SECRET = window.MB1_FIRMA || 'MB1-PUBLICO-v2.3.1';
