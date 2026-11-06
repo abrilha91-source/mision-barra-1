@@ -161,7 +161,7 @@ async function cargarServidor() { if (!SRV) return; try { const [av, rs, pa] = a
 async function cargarHoja() { const k = localStorage.getItem('mb1_hk') || ''; const g = h => fetch(SHEET + '?hoja=' + h + '&clave=' + encodeURIComponent(k), { cache: 'no-store' }).then(r => r.json());
   const [a, i] = await Promise.all([g('actividad'), g('ingresos')]); if (a && a.error) throw new Error('clave de lectura incorrecta');
   const fx = r => Object.assign({}, r, { ts: r.ts || '', preguntas: +r.preguntas || 0, aciertos: +r.aciertos || 0, duracion_s: +r.duracion_s || 0, ip: 'web' }), rango = r => (!af.desde || String(r.ts).slice(0, 10) >= af.desde) && (!af.hasta || String(r.ts).slice(0, 10) <= af.hasta);
-  SRVDATA = { act: (Array.isArray(a) ? a : []).map(fx).filter(rango).reverse(), ing: (Array.isArray(i) ? i : []).map(fx).filter(rango).reverse(), t: Date.now() }; }
+  SRVDATA = { act: limpioH(a).map(fx).filter(rango).reverse(), ing: limpioH(i).map(fx).filter(rango).reverse(), t: Date.now() }; }
 function claveHoja() { const k = prompt('Clave de lectura de la Hoja de registro (está en tu archivo privado de códigos):', localStorage.getItem('mb1_hk') || ''); if (k == null) return; localStorage.setItem('mb1_hk', k.trim()); SRVDATA.t = 0; if (tab === 'actividad') actualizarAct(); actualizarHoja(); }
 async function cargarActividad() { if (!SRV && SHEET) return cargarHoja(); const q = new URLSearchParams(); if (af.desde) q.set('desde', af.desde); if (af.hasta) q.set('hasta', af.hasta); const [a, i] = await Promise.all([api('api/actividad?' + q), api('api/ingresos?' + q)]); SRVDATA = { act: Array.isArray(a) ? a : [], ing: Array.isArray(i) ? i : [], t: Date.now() }; }
 
