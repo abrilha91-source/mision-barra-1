@@ -1,6 +1,6 @@
 'use strict';
 /* Misión: Obtener la Barra I — versión PWA (sin servidor). Datos solo en este dispositivo. */
-const VER = '2.3.2';
+const VER = '2.4';
 // Firma: en el servidor de intranet la entrega /config.js (clave aleatoria por instalación, solo en la red local).
 // En la versión pública no hay clave secreta: es una suma de verificación pública (detecta errores de copia, no falsificación).
 const SECRET = window.MB1_FIRMA || 'MB1-PUBLICO-v2.3.1';
@@ -130,7 +130,8 @@ function claveHoja() { const k = prompt('Clave de lectura de la Hoja de activida
 async function cargarActividad() { if (!SRV && SHEET) return cargarHoja(); const q = new URLSearchParams(); if (af.desde) q.set('desde', af.desde); if (af.hasta) q.set('hasta', af.hasta); const [a, i] = await Promise.all([api('api/actividad?' + q), api('api/ingresos?' + q)]); SRVDATA = { act: Array.isArray(a) ? a : [], ing: Array.isArray(i) ? i : [], t: Date.now() }; }
 
 /* ---------- arranque / login ---------- */
-function render() { document.body.dataset.tema = S.tema; const app = $('#app'); if (!S.sesion) return app.innerHTML = vLogin(); if (S.sesion.perfil === 'admin') return app.innerHTML = vMando(); if (!P()) { S.sesion = null; return render(); } app.innerHTML = vUsuario(); }
+function render() { render0(); const m = document.getElementById('alcmod'); if (m && window.ALCMOD) window.ALCMOD.mount(m); }
+function render0() { document.body.dataset.tema = S.tema; const app = $('#app'); if (!S.sesion) return app.innerHTML = vLogin(); if (S.sesion.perfil === 'admin') return app.innerHTML = vMando(); if (!P()) { S.sesion = null; return render0(); } app.innerHTML = vUsuario(); }
 let loginPerfil = 'cadete';
 function vLogin() {
   const c = loginPerfil === 'cadete';
@@ -166,12 +167,14 @@ function salir() { if (esPiloto()) { if (!confirm('¿Cerrar el usuario piloto? S
 
 let tab = 'hoy';
 function vUsuario() {
-  const p = P(), tabs = [['hoy', 'Hoy', '☀'], ['practicar', 'Practicar', '✎'], ['tecnicas', 'Técnicas', '★'], ['ejercicio', 'Ejercicio', '⏱'], ['sombra', 'Mi sombra', '⚑']];
+  const p = P(), tabs = [['hoy', 'Hoy', '☀'], ['practicar', 'Practicar', '✎'], ['tecnicas', 'Técnicas', '★'], ['ejercicio', 'Ejercicio', '⏱'], ['sombra', 'Mi sombra', '⚑'], ['alc', 'ALC', '▤']];
   if (p.perfil === 'planta' && paseActivo()) tabs.push(['aplicar', 'Aplicar', '✔']);
-  const body = { hoy: vHoy, practicar: vPracticar, tecnicas: vTecnicas, ejercicio: vEjercicio, sombra: vSombra, aplicar: vAplicar }[tab] || vHoy;
+  const body = { hoy: vHoy, practicar: vPracticar, tecnicas: vTecnicas, ejercicio: vEjercicio, sombra: vSombra, aplicar: vAplicar, alc: vAlc }[tab] || vHoy;
   return `<header><div><b>${esc(p.nombre)}</b><span>${p.perfil === 'cadete' ? `${p.anio}° año · ${esc(p.gp || '')}` : 'Planta docente'}</span></div><button class="ico" onclick="ayuda()" title="Ayuda">?</button><button class="ico" onclick="tema()" title="Tema">◐</button></header>
   ${p.piloto ? `<div class="pilotbar">Usuario piloto · demostración <button onclick="presentar(GUION_I||0)">Guion</button></div>` : ''}<main>${body(p)}</main><nav class="tabbar">${tabs.map(([k, l, i]) => `<button class="${tab === k ? 'on' : ''}" onclick="tab='${k}';render();scrollTo(0,0)"><i>${i}</i>${l}</button>`).join('')}</nav>`;
 }
+/* v2.4: sección ALC · ALCPT (módulo alc.js): ALC Parcial 1 y 2, evaluación por semestre y por parcial, Examen final con formas PDF y audio MP3 */
+function vAlc() { return '<div id="alcmod">' + (window.ALCMOD ? '' : '<section class="card"><p class="mini">Cargando la sección ALC · ALCPT…</p></section>') + '</div>'; }
 function tema() { S.tema = S.tema === 'claro' ? 'oscuro' : 'claro'; save(); render(); }
 const TECNICAS = [
   ['Bloque de concentración', 'Trabaja 25 min sin celular ni distracciones y descansa 5. Cuatro bloques = descanso largo. La app cuenta tus minutos.'],
@@ -329,8 +332,8 @@ function calif(ok) { const p = P(), id = TC.ids[TC.i], c = p.cards[id] || { box:
 /* ---------- Centro de mando ---------- */
 let fil = { anio: '', gp: '', gi: '', dia: '' }, grupoPor = 'gp';
 function vMando() {
-  const tabs = [['mando', 'Mando'], ['avance', 'Avance'], ['antig', 'Antigüedad'], ['estad', 'Estadística'], ['areas', 'Áreas'], ['riesgo', 'En riesgo'], ['eval', 'Evaluación'], ['aplic', 'Aplicadores'], ['actividad', 'Actividad'], ['ajustes', 'Ajustes']];
-  const body = { actividad: mActividad, avance: mAvance, antig: mAntig, estad: mEstad, areas: mAreas, riesgo: mRiesgo, eval: mEval, aplic: mAplic, ajustes: mAjustes, mando: mMando }[tab] || mAvance;
+  const tabs = [['mando', 'Mando'], ['avance', 'Avance'], ['antig', 'Antigüedad'], ['estad', 'Estadística'], ['areas', 'Áreas'], ['riesgo', 'En riesgo'], ['eval', 'Evaluación'], ['aplic', 'Aplicadores'], ['actividad', 'Actividad'], ['alc', 'ALC · ALCPT'], ['ajustes', 'Ajustes']];
+  const body = { alc: vAlc, actividad: mActividad, avance: mAvance, antig: mAntig, estad: mEstad, areas: mAreas, riesgo: mRiesgo, eval: mEval, aplic: mAplic, ajustes: mAjustes, mando: mMando }[tab] || mAvance;
   return `<header><div><b>Centro de mando</b><span>${esc(S.sesion.nombre)} · Administración</span></div><button class="ico" onclick="ayuda()" title="Instructivos">?</button><button class="ico" onclick="tema()" title="Tema">◐</button><button class="ico" onclick="salir()" title="Cerrar sesión">⎋</button></header>
   <nav class="tabs">${tabs.map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-tab="${k}" onclick="tab='${k}';render()">${l}</button>`).join('')}</nav><main class="wide">${body()}</main>`;
 }
@@ -468,7 +471,10 @@ const AYUDA = {
   <h3>Activar el pase de aplicador</h3><ol><li>La Mesa de Inglés te entrega un pase, por ejemplo <b>B70-1031-14-K3Q9</b>: forma B, 70 min, 31 oct, válido hasta las 14:00.</li><li>Entra con <b>tu</b> matrícula (la misma que dio la Mesa): con otra no funciona.</li><li>En Hoy › ¿Te habilitaron como aplicador? escribe el pase y oprime <b>Activar</b>. Aparece la pestaña <b>Aplicar</b>.</li></ol>
   <h3>Aplicar la evaluación</h3><ol><li>En Aplicar está el <b>código del examen</b> del día (ej. B-70-4821). Díctalo a los evaluados.</li><li>Cada evaluado entra con su perfil, abre Ejercicio, escribe el código y oprime Iniciar.</li><li>Supervisa: la evaluación está en pantalla completa y registra cada salida; a la tercera se entrega sola.</li><li>Al concluir, anota de cada evaluado: <b>matrícula, puntaje, salidas y folio</b>. Ese registro es el respaldo oficial para la Mesa de Inglés.</li><li>En Aplicar puedes verificar cualquier folio: captura los cinco datos y oprime Verificar.</li></ol>
   <h3>Vigencia</h3><p>El pase vale solo el día de su emisión y hasta la hora indicada; después la pestaña Aplicar desaparece. El código del examen cambia cada día.</p>
-  <h3>Problemas frecuentes</h3><ul><li>“El pase no corresponde a tu matrícula”: entraste con otra matrícula; cierra sesión y entra con la registrada.</li><li>“El pase ya venció”: pide uno nuevo a la Mesa de Inglés.</li><li>El evaluado ya presentó: una matrícula no puede presentar dos veces el mismo código en el mismo equipo.</li></ul>`]};
+  <h3>Problemas frecuentes</h3><ul><li>“El pase no corresponde a tu matrícula”: entraste con otra matrícula; cierra sesión y entra con la registrada.</li><li>“El pase ya venció”: pide uno nuevo a la Mesa de Inglés.</li><li>El evaluado ya presentó: una matrícula no puede presentar dos veces el mismo código en el mismo equipo.</li></ul>`],
+  alc: ['ALC · ALCPT', `<h3>Qué contiene</h3><ul><li><b>ALC · Parcial 1 y 2</b>: cada parcial evalúa un libro del curso (Plan de estudios); también semestral, por libro y por lección.</li><li><b>ALCPT · semestre y parcial</b>: evaluación por semestre, por parcial (acumulativa opcional) o por forma.</li><li><b>Examen final</b>: formas originales del ALCPT en PDF con su audio MP3, hoja de respuestas A–D, clave opcional y tablas de conversión.</li><li><b>Calificación</b>: parcial = examen 60 % + portafolio 30 % + participación 10 %; final = parciales 60 % + ALCPT 40 %.</li></ul>
+  <h3>Primera vez en un equipo</h3><ol><li>Abre la pestaña <b>ALC</b> (cadete y planta) o <b>ALC · ALCPT</b> (administración).</li><li>Oprime <b>Importar banco</b> y elige el archivo <b>banco_alcpt_alc_privado.json</b> que entrega la Mesa de Inglés. Se guarda solo en ese equipo.</li><li>En <b>Examen final</b> (planta o administración) agrega cada forma en PDF, su audio MP3 y, si la tienes, la clave.</li></ol><p class="mini">El banco, las formas, los audios y las claves no se publican. Un cadete no ve la clave ni la revisión del examen final.</p>`]
+};
 let ayudaK = 'cadete';
 function ayuda(k) { if (k) ayudaK = k; let el = $('#ayuda'); if (!el) { el = document.createElement('div'); el.id = 'ayuda'; document.body.appendChild(el); }
   el.innerHTML = `<div class="ayc"><div class="gh"><b>Instructivos</b><button onclick="$('#ayuda').remove()">✕</button></div><div class="seg">${Object.entries(AYUDA).map(([k, v]) => `<button class="${ayudaK === k ? 'on' : ''}" onclick="ayuda('${k}')">${v[0]}</button>`).join('')}</div><div class="ayb">${AYUDA[ayudaK][1]}</div><p class="mini">El instructivo de administración se entrega por separado a la Mesa de Inglés.</p></div>`; }

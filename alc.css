@@ -1,0 +1,34 @@
+/* Módulo ALC · ALCPT (v2.4) — usa los colores y tipografía de Misión Barra I; todo bajo #alcmod */
+#alcmod .alc-tabs{display:flex;overflow-x:auto;gap:6px;margin:0 0 12px;padding:2px 0 6px;scrollbar-width:none}
+#alcmod .alc-tabs button{border:1.5px solid var(--ln);background:var(--card);border-radius:999px;padding:7px 13px;white-space:nowrap;cursor:pointer;font-weight:600;color:var(--mu)}
+#alcmod .alc-tabs .on{background:var(--v);border-color:var(--v);color:#fff}
+#alcmod h1{font-size:18px;margin:0 0 6px}#alcmod h2{font-size:16px;margin:12px 0 6px}#alcmod h3{margin:10px 0 6px}
+#alcmod .muted{color:var(--mu);font-size:13.5px}
+#alcmod label.f{margin:10px 0 2px}
+#alcmod .btn{margin:4px 6px 4px 0}#alcmod .btn.peligro{background:var(--bad)}
+#alcmod .row>div{flex:1 1 140px}
+#alcmod .big:not(.btn){font-size:30px;font-weight:800;color:var(--v2)}#alcmod .big.okt{color:var(--ok)}#alcmod .big.badt{color:var(--bad)}
+#alcmod .okt{font-weight:700}#alcmod .badt{font-weight:700}
+#alcmod .hud{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;font-weight:700;color:var(--mu)}
+#alcmod .pbar{height:8px;background:var(--ln);border-radius:99px;overflow:hidden;margin:6px 0 10px}#alcmod .pbar i{display:block;height:100%;background:var(--v2)}
+#alcmod .tag{margin:2px}
+#alcmod .txt{background:var(--bg);border-radius:12px;padding:12px;white-space:pre-line;line-height:1.5;margin:8px 0}
+#alcmod .q{font-weight:600;white-space:pre-line}
+#alcmod .op{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border:1.5px solid var(--ln);background:var(--card);border-radius:14px;padding:12px 14px;margin:7px 0;cursor:pointer;font-size:15px}
+#alcmod .op b{flex:none;width:1.6em}#alcmod .op.sel{border-color:var(--v2);background:rgba(46,107,84,.08)}#alcmod .op.ok{border-color:var(--ok);background:rgba(29,138,78,.12)}#alcmod .op.no{border-color:var(--bad);background:rgba(192,57,43,.1)}
+#alcmod .fb{border-radius:12px;padding:10px 12px;margin-top:8px}#alcmod .fb.ok{background:rgba(29,138,78,.12)}#alcmod .fb.no{background:rgba(192,57,43,.1)}
+#alcmod .seg button{flex:1 1 auto}
+#alcmod td{white-space:normal}
+#alcmod code{background:var(--bg);padding:1px 4px;border-radius:5px}
+#alcmod .pdfbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0}
+#alcmod .pdfv{max-height:72vh;overflow:auto;background:var(--bg);border:1px solid var(--ln);border-radius:12px;padding:2px;-webkit-overflow-scrolling:touch}
+#alcmod .pdfv canvas{display:block;margin:0 auto 6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+#alcmod .pdfd summary{cursor:pointer;padding:6px 0}
+#alcmod .hoja{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 14px;margin:8px 0}
+#alcmod .hsec{grid-column:1/-1;font-weight:700;color:var(--v2);margin-top:8px}
+#alcmod .hr{display:flex;align-items:center;gap:5px;padding:3px 0;border-bottom:1px solid var(--ln)}
+#alcmod .hr>b{width:2.4em;text-align:right;margin-right:4px}
+#alcmod .hr button{width:38px;height:38px;border-radius:50%;border:1.5px solid var(--ln);background:var(--card);font-weight:700;cursor:pointer;padding:0}
+#alcmod .hr button.sel{background:var(--v);color:#fff;border-color:var(--v)}#alcmod .hr button.ok{background:var(--ok);color:#fff;border-color:var(--ok)}#alcmod .hr button.no{background:var(--bad);color:#fff;border-color:var(--bad)}
+#alcmod .hr button.pa{border-radius:10px;width:34px;background:var(--bg);color:var(--v2)}
+@media print{.tabbar,.tabs,header,#alcmod .alc-tabs,#alcmod .noprint{display:none!important}}
