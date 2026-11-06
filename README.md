@@ -1,6 +1,12 @@
 # Misión: Obtener la Barra I
 Práctica de inglés tipo ALCPT (Mesa de Inglés, Esc. Mil. Enfría.). PWA sin servidor: se instala en el celular y funciona sin internet. Se publica vacía; todos los datos viven en el dispositivo de cada usuario.
 
+## v2.6 · Registro automático completo (Hoja de Google)
+- Cada cadete envía solo, sin códigos: ingresos, ejercicios, **resumen de avance** (firmado), **evaluaciones oficiales** (folio, forma, salidas, puntaje) y **resultados ALC / ALCPT / Examen final**.
+- Administración los carga sola al entrar (Mando › Actualizar) en Avance, Estadística, En riesgo, Antigüedad, Áreas, Mando y ALC › Resultados, combinados con los códigos importados.
+- El código de avance queda como respaldo opcional.
+- Requiere el script v2 de la Hoja (misma URL, nueva versión de la implementación). Con el script anterior la app sigue funcionando: lo nuevo queda en cola en cada equipo y se envía al actualizar el script.
+
 ## v2.5 · Una sola app, diseño dinámico, sin perfil Planta
 - Diseño nuevo: degradados, animaciones, confeti al acertar y al terminar, modo claro/oscuro, primero móvil, Noto Sans.
 - El acceso queda en dos perfiles: **Cadete** y **Administración**. Se quitó la opción Planta del inicio de sesión y su instructivo.

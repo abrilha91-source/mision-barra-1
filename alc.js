@@ -283,7 +283,7 @@ function calificar(){const e=EX,cfg=CFG();let ok=0;const por={};const its=e.its.
  const N=its.length||1,pct=Math.round(1000*ok/N)/10;let cal=Math.round(pct)/10,conv='';
  if(e.fuente==='final'&&e.c.tabla){const cc=convertir(ok,e.c.tabla);if(cc!=null){cal=cc;conv=`Conversión: ${BANK.conversion[e.c.tabla].nombre}`}else{conv=`${ok} puntos: debajo del mínimo de la tabla (${BANK.conversion[e.c.tabla].nombre}). No acreditado.`;cal=Math.min(5,cal)}}
  const res={fecha:new Date().toISOString(),nom:e.nom,fuente:e.fuente,esq:esqId(),curso:e.c.cursoNom||'',eval:evalTxt(e),sem:e.c.curso||'',par:e.c.par||'',forma:e.c.forma||'',modo:e.modo,n:its.length,sinClave:e.its.length-its.length,ok,pct,cal,L:sec.L,R:sec.R,min:Math.round((Date.now()-e.ini)/60000)};
- res.m=matDef()||'';if(e.mat)res.m=e.mat;if(!PIL()){const all=RES();all.push(res);setRES(all)}
+ res.m=matDef()||'';if(e.mat)res.m=e.mat;if(!PIL()){const all=RES();all.push(res);setRES(all);try{window.MB1SYNC&&MB1SYNC.alc(res)}catch(er){}}
  const r=e.r,lst=e.its;const titu=titulo(e);EX=null;if(AUD)AUD.pause();if(PISTA){PISTA.el.pause();PISTA=null}VIEW='resultados';nav();
  V.innerHTML=`<div class="card"><h1>Resultado</h1><p class="muted">${titu}${res.nom?' · '+esc(res.nom):''}</p>
  <div class="row"><div><div class="big">${ok}/${its.length}</div><div class="muted">aciertos${res.sinClave?` (${res.sinClave} sin clave no cuentan)`:''}</div></div><div><div class="big">${pct}</div><div class="muted">porcentaje</div></div><div><div class="big ${cal>=cfg.minima?'okt':'badt'}">${cal.toFixed(1)}</div><div class="muted">calificación (0–10) · ${cal>=cfg.minima?'Aprobado':'No aprobado'} (mínima ${cfg.minima})</div></div></div>${conv?`<p class="mini">${esc(conv)}</p>`:''}
@@ -319,7 +319,7 @@ function vCalif(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}const cfg=CF
 function tablaRes(a){const m=CFG().minima;return `<div class="tw"><table><tr><th>Fecha</th><th>Cadete</th><th>Prueba</th><th>Curso</th><th>Evaluación</th><th>Modo</th><th>Aciertos</th><th>%</th><th>Cal.</th></tr>${a.map(r=>`<tr><td>${fechaL(r.fecha)}</td><td>${esc(r.nom||'—')}</td><td>${r.fuente==='final'?'FINAL':r.fuente.toUpperCase()}</td><td>${esc(r.curso||r.sem||'—')}</td><td>${esc(r.eval)}</td><td>${r.modo==='examen'?'Examen':'Práctica'}</td><td>${r.ok}/${r.n}</td><td>${r.pct}</td><td class="${r.cal>=m?'okt':'badt'}">${r.cal.toFixed(1)}</td></tr>`).join('')}</table></div>`}
 function vRes(){vRes0();if(!ADM())V.querySelectorAll('.adm').forEach(x=>x.remove())}
 function vRes0(){const mm=matDef(),a=RES().filter(r=>ADM()||r.m===mm).slice().reverse();
- V.innerHTML=`<div class="card"><h1>Resultados</h1><p class="muted">Guardados solo en este dispositivo.</p>${a.length?tablaRes(a):'<p>Aún no hay resultados.</p>'}
+ V.innerHTML=`<div class="card"><h1>Resultados</h1><p class="muted">${ADM()?'Incluye los de este dispositivo y los que llegan solos de la Hoja de registro (Actualizar en Mando).':'Se guardan en este dispositivo y se envían solos a la Mesa de Inglés.'}</p>${a.length?tablaRes(a):'<p>Aún no hay resultados.</p>'}
  <div class="row noprint"><button class="btn" id="csv" ${a.length?'':'disabled'}>Exportar CSV</button><button class="btn ghost" onclick="print()">Imprimir</button><button class="btn peligro adm" id="del" ${a.length?'':'disabled'}>Borrar resultados</button></div></div>
  ${a.length?`<div class="card"><h2>Promedios (solo exámenes)</h2>${resumen(a)}</div>`:''}`;
  $('#csv').onclick=()=>{const h=['Fecha','Cadete','Prueba','Esquema','Curso','Parcial','Forma','Evaluación','Modo','Reactivos calificados','Sin clave','Aciertos','Porcentaje','Calificación','Auditiva','Lectura','Minutos'];
@@ -346,5 +346,6 @@ function vBanco0(){const cnt=(src,f)=>pool(Object.assign({fuente:src,sec:'',tipo
 let CARGA=null;function cargar(){if(CARGA)return CARGA;CARGA=(window.indexedDB?Promise.all([idbGet('bank'),idbGet('formas')]).then(([b,f])=>{if(b&&b.alcpt)BANK=b;if(Array.isArray(f))FORMAS=f}).catch(()=>{}):Promise.resolve());return CARGA}
 let SESK=null;function mount(el){const sk=(()=>{const x=SES();return x?x.perfil+'|'+x.m:''})();if(sk!==SESK){SESK=sk;if(EX){EX=null;if(AUD)AUD.pause();if(PISTA){PISTA.el.pause();PISTA=null}}VIEW='inicio';VARG='';F={}}ROOT=el;el.innerHTML=`<div class="alc-tabs" id="alcnav"></div><div id="alcv" class="alc-v"><section class="card"><p class="mini">Cargando…</p></section></div>`;V=el.querySelector('#alcv');
  el.querySelector('#alcnav').onclick=ev=>{const b=ev.target.closest('button[data-v]');if(b)go(b.dataset.v)};cargar().then(()=>{if(ROOT===el)render()})}
-window.ALCMOD={mount,VER,go,estado:()=>({bank:!!BANK,formas:FORMAS.length,view:VIEW,examen:!!EX})};
+function agregarRes(l){const all=RES(),k=r=>(r.m||'')+'|'+r.fecha,s=new Set(all.map(k));let n=0;(l||[]).forEach(r=>{if(!r||!r.fecha||s.has(k(r)))return;s.add(k(r));all.push(r);n++});if(n){all.sort((x,y)=>String(x.fecha).localeCompare(String(y.fecha)));setRES(all)}return n}
+window.ALCMOD={mount,VER,go,agregarRes,estado:()=>({bank:!!BANK,formas:FORMAS.length,view:VIEW,examen:!!EX})};
 })();
