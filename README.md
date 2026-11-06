@@ -1,6 +1,12 @@
 # Misión: Obtener la Barra I
 Práctica de inglés tipo ALCPT (Mesa de Inglés, Esc. Mil. Enfría.). PWA sin servidor: se instala en el celular y funciona sin internet. Se publica vacía; todos los datos viven en el dispositivo de cada usuario.
 
+## v2.5 · Una sola app, diseño dinámico, sin perfil Planta
+- Diseño nuevo: degradados, animaciones, confeti al acertar y al terminar, modo claro/oscuro, primero móvil, Noto Sans.
+- El acceso queda en dos perfiles: **Cadete** y **Administración**. Se quitó la opción Planta del inicio de sesión y su instructivo.
+- La función de aplicador pasa a Administración: Evaluación (código del día, resultados, verificar folio) y Aplicadores → botón **Aplicar** en cada pase activo.
+- Los datos guardados de planta (perfiles, pases, avances) se conservan sin cambios en el equipo; una sesión de planta abierta se cierra sin borrar nada.
+
 ## v2.4 · Sección ALC · ALCPT (agregada; todo lo anterior se conserva)
 - Nueva pestaña **ALC** (cadete y planta) y **ALC · ALCPT** (Centro de mando), con: ALC Parcial 1 y 2; evaluación por semestre y por parcial (ALCPT); **Examen final** con formas originales en PDF y audio MP3, hoja de respuestas A–D, clave opcional y tablas de conversión; Calificación; Resultados; Banco.
 - El banco (`banco_alcpt_alc_privado.json`), las formas, los audios y las claves se importan en cada equipo (IndexedDB `mb1_alc`) y **no se publican**. El cadete no ve la clave ni la revisión del examen final.

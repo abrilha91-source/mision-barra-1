@@ -239,7 +239,7 @@ function vHoja(){const e=EX,fm=FORMAS.find(f=>f.id===e.c.fid)||{aud:{}},aud=fm.a
   if(b.classList.contains('pa')){if(!prac&&e.plays[j]>=2){toast('Este audio ya se escuchó 2 veces');return}e.plays[j]++;tocar(e.c.fid,+b.dataset.n);return}
   const it=e.its[j];if(prac&&e.r[j]!==null&&it.k!=null)return;const x=+b.dataset.x;e.r[j]=e.r[j]===x&&!prac?null:x;
   r.querySelectorAll('button[data-x]').forEach(y=>{const yx=+y.dataset.x;y.className=(e.r[j]===yx?'sel':'')+(prac&&e.r[j]!==null&&it.k!=null?(yx===it.k?' ok':(e.r[j]===yx?' no':'')):'')});
-  $('#cnt').textContent=`${e.r.filter(z=>z!==null).length}/${e.its.length} contestados`});
+  $('#cnt').textContent=`${e.r.filter(z=>z!==null).length}/${e.its.length} contestados`;if(prac&&it.k!=null&&e.r[j]!==null&&window.FX){if(e.r[j]===it.k)FX.ok(b);else FX.no()}});
  $('#ent').onclick=()=>{const sin=e.r.filter(x=>x===null).length;if(sin&&!confirm(`Hay ${sin} reactivos sin contestar. ¿Entregar de todos modos?`))return;entregarHoja()}}
 function entregarHoja(){const e=EX;const conK=e.its.filter(i=>i.k!=null).length;
  if(conK){calificar();return}
@@ -271,7 +271,7 @@ function vExamen(){if(!EX){go('inicio');return}if(EX.hoja){vHoja();return}const 
  ${done?`<div class="fb ${ans===it.k?'ok':'no'}"><b>${ans===it.k?'Correcto':'Incorrecto · respuesta: '+L[it.k]}</b><br>${esc(it.e)}</div>`:''}
  <div class="row" style="margin-top:10px"><button class="btn ghost" id="prev" ${e.i?'':'disabled'}>Anterior</button>${e.i<e.its.length-1?`<button class="btn" id="next">Siguiente</button>`:`<button class="btn" id="fin">Terminar y calificar</button>`}</div>
  <p class="mini">Respondidas: ${e.r.filter(x=>x!==null).length} de ${e.its.length}. <a href="#" id="abort">Cancelar</a></p></div>`;
- V.querySelectorAll('.op').forEach(b=>b.onclick=()=>{e.r[e.i]=+b.dataset.j;vExamen()});
+ V.querySelectorAll('.op').forEach(b=>b.onclick=()=>{e.r[e.i]=+b.dataset.j;vExamen();if(prac&&it.k!=null&&window.FX){if(e.r[e.i]===it.k)FX.ok(V.querySelector('.op.ok'));else FX.no()}});
  const ps=$('#pista');if(ps){if(PISTA&&PISTA.fid===e.c.fid){ps.replaceWith(PISTA.el);PISTA.el.id='pista'}else audioURL(e.c.fid,null).then(u=>{if(u){ps.src=u;PISTA={fid:e.c.fid,el:ps}}})}
  const p=$('#play');if(p)p.onclick=()=>{if(!prac&&e.plays[e.i]>=2){toast('Ya no quedan reproducciones');return}e.plays[e.i]++;if(it.aud)tocar(e.c.fid,it.n);else hablar(it.s);if(!prac)p.textContent=`▶ Escuchar (${2-e.plays[e.i]} restantes)`};
  $('#prev').onclick=()=>{e.i--;vExamen()};const n=$('#next');if(n)n.onclick=()=>{e.i++;vExamen()};
@@ -291,7 +291,7 @@ function calificar(){const e=EX,cfg=CFG();let ok=0;const por={};const its=e.its.
  <h3>Por tipo</h3><p>${Object.entries(por).map(([k,v])=>`<span class="tag">${esc(k)}: ${v[0]}/${v[1]}</span>`).join('')}</p>
  <div class="row noprint"><button class="btn" onclick="print()">Imprimir</button><a class="btn ghost" href="#calif">Ir a la calificación</a></div></div>
  ${!ADM()&&e.fuente==='final'&&e.modo==='examen'?'':`<div class="card"><h2>Revisión de errores</h2>${lst.map((it,j)=>it.k==null||r[j]===it.k?'':`<div style="border-bottom:1px solid var(--b);padding:8px 0"><b>${it.n?it.n:j+1}.</b> ${it.s?`<div class="txt">${esc(it.s)}</div>`:''}<div><b>${esc(it.q)}</b></div><div class="badt">Respuesta: ${r[j]===null?'(sin responder)':L[r[j]]+') '+esc(it.o[r[j]])}</div><div class="okt">Correcta: ${L[it.k]}) ${esc(it.o[it.k])}</div><div class="mini">${esc(it.e)}</div></div>`).join('')||'<p>¡Sin errores!</p>'}</div>`}`;
- SS('mb1_alc_ultimo',res)}
+ SS('mb1_alc_ultimo',res);if(window.FX&&cal>=cfg.minima)FX.fin(cal>=9?200:130)}
 /* ---------- calificación ---------- */
 function vCalif(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}const cfg=CFG(),u=LS('mb1_alc_ultimo',null),d=LS('mb1_alc_calc_'+esqId(),{}),np=parN(),sup=esqId()==='superioridad';
  const conv=BANK.conversion||{};

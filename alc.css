@@ -32,3 +32,13 @@
 #alcmod .hr button.sel{background:var(--v);color:#fff;border-color:var(--v)}#alcmod .hr button.ok{background:var(--ok);color:#fff;border-color:var(--ok)}#alcmod .hr button.no{background:var(--bad);color:#fff;border-color:var(--bad)}
 #alcmod .hr button.pa{border-radius:10px;width:34px;background:var(--bg);color:var(--v2)}
 @media print{.tabbar,.tabs,header,#alcmod .alc-tabs,#alcmod .noprint{display:none!important}}
+/* v2.5 · diseño dinámico */
+#alcmod .alc-tabs .on{background:linear-gradient(135deg,#6366f1,#a855f7 55%,#ec4899);border-color:transparent;box-shadow:0 6px 16px -8px #a855f7}
+#alcmod .alc-tabs button{transition:background .25s,color .25s}
+#alcmod .alc-v>*{animation:sube .35s cubic-bezier(.2,.8,.2,1) both}
+#alcmod .pbar i{background:linear-gradient(135deg,#6366f1,#a855f7 55%,#ec4899);transition:width .45s}
+#alcmod .op{transition:transform .15s,border-color .2s,background .2s}#alcmod .op:active{transform:scale(.98)}
+#alcmod .op.sel{background:rgba(99,102,241,.1)}#alcmod .op.ok.sel{animation:pop .45s}#alcmod .op.no{animation:tiembla .35s}
+#alcmod .big:not(.btn){background:linear-gradient(135deg,#6366f1,#a855f7 55%,#ec4899);-webkit-background-clip:text;background-clip:text;color:transparent}
+#alcmod .big.okt:not(.btn){background:linear-gradient(135deg,#10b981,#06b6d4);-webkit-background-clip:text;background-clip:text}#alcmod .big.badt:not(.btn){background:linear-gradient(135deg,#f43f5e,#f97316);-webkit-background-clip:text;background-clip:text}
+#alcmod .hr button{transition:transform .15s}#alcmod .hr button:active{transform:scale(.88)}#alcmod .hr button.sel{background:linear-gradient(135deg,#6366f1,#a855f7);border-color:transparent}
