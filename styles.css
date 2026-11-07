@@ -134,3 +134,6 @@ th{color:var(--v)}[data-tema=oscuro] th{color:var(--v2)}
 @keyframes pop{40%{transform:scale(1.04)}}@keyframes tiembla{20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
 #confeti{position:fixed;inset:0;pointer-events:none;z-index:80}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* v2.7: tres perfiles en la entrada */
+.seg{flex-wrap:wrap}.seg button{flex:1 1 auto;min-width:5.5rem}

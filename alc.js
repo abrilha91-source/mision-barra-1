@@ -21,10 +21,10 @@ async function idbDel(k){const d=await idb();return new Promise(ok=>{const t=d.t
 let BANK=null;
 /* integración con Misión Barra I: sesión, rol y piloto (solo lectura del estado de la app) */
 const SES=()=>{try{return (typeof S!=='undefined'&&S&&S.sesion)||null}catch(e){return null}};
-const ADM=()=>{const s=SES();return !s||s.perfil!=='cadete'};
+const ADM=()=>{const s=SES();return !!(s&&s.perfil==='admin')}; const SOLO_LEC=()=>{const s=SES();return !!(s&&s.perfil==='directora')};
 const PIL=()=>{try{return typeof esPiloto==='function'&&esPiloto()}catch(e){return false}};
-const nomDef=()=>{const s=SES();return s&&s.perfil!=='admin'?s.nombre:(localStorage.getItem('mb1_alc_nom')||'')};
-const matDef=()=>{const s=SES();return s&&s.perfil!=='admin'?s.m:''};
+const nomDef=()=>{const s=SES();return s&&s.perfil!=='admin'&&s.perfil!=='directora'?s.nombre:(localStorage.getItem('mb1_alc_nom')||'')};
+const matDef=()=>{const s=SES();return s&&s.perfil!=='admin'&&s.perfil!=='directora'?s.m:''};
 const RES=()=>LS('mb1_alc_res',[]),setRES=a=>SS('mb1_alc_res',a);
 /* ---------- esquemas ---------- */
 const ESQ_DEF={programa:{nombre:'2 libros por semestre',parciales:2,pond:{examen:.6,portafolio:.3,participacion:.1,parciales:.6,final:.4,minima:6},final:'ALCPT',cursos:[]}};
@@ -45,7 +45,7 @@ function render(){if(!V||!document.body.contains(V))return;nav();const h=VIEW;
  ({inicio:vInicio,alcpt:vALCPT,alc:vALC,final:vFinal,calif:vCalif,resultados:vRes,banco:vBanco,examen:vExamen}[h]||vInicio)();links();const top=ROOT.getBoundingClientRect().top+scrollY-70;if(scrollY>top)window.scrollTo(0,Math.max(0,top))}
 const sinBanco=()=>`<div class="card"><h1>Importa el banco</h1><p class="muted">Esta sección se publica <b>vacía</b>. Para usarla, importa el archivo <b>banco_alcpt_alc_privado.json</b>. Se guarda solo en este dispositivo.</p><label class="btn big">Importar banco (.json)<input type="file" class="imp" accept=".json,application/json" hidden></label></div>`;
 function bindImp(){document.querySelectorAll('input.imp').forEach(i=>i.onchange=importar)}
-function importar(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async()=>{let b;
+function importar(e){if(SOLO_LEC()||!ADM()){alert('Solo Administración puede importar el banco.');e.target.value='';return}const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async()=>{let b;
  try{b=JSON.parse(String(r.result).replace(/^\uFEFF/,''))}catch(x){alert('El archivo no es JSON válido.');return}
  if(!b||b.tipo!=='banco_alcpt_alc'||!Array.isArray(b.alcpt)||!Array.isArray(b.alc)){alert('Este archivo no es un banco ALCPT/ALC. Las formas del Final se cargan en la pestaña «Final».');return}
  BANK=b;try{await idbSet('bank',b)}catch(x){alert('No se pudo guardar en el dispositivo: '+x.message)}
@@ -122,7 +122,7 @@ function vALC(){const m=(VARG||'').match(/^p([12])$/);if(m&&BANK){const f=filtro
    Formato CSV (encabezado): forma,titulo,n,seccion,guion,pregunta,a,b,c,d,clave   (seccion = L o R; clave = A–D) */
 let FORMAS=[];
 const fKey=(fid,n)=>'aud|'+fid+'|'+(n==null?'forma':n);
-async function guardarFormas(){await idbSet('formas',FORMAS)}
+async function guardarFormas(){if(SOLO_LEC()||!ADM())return;await idbSet('formas',FORMAS)}
 function normItem(it,j){const o=(it.o||[it.a,it.b,it.c,it.d]).map(x=>String(x??'').trim()).filter(x=>x!=='');let k=it.k;if(typeof k==='string')k=k.trim()?L.indexOf(k.trim().toUpperCase()[0]):null;if(!(k>=0&&k<o.length))k=null;
  const sec=/^(l|aud|list)/i.test(String(it.sec||it.seccion||''))?'L':'R';return {n:+it.n||j+1,sec,s:String(it.s||it.guion||'').replace(/\\n/g,'\n'),q:String(it.q||it.pregunta||''),o,k}}
 function parseCSV(t){const rows=[];let r=[],c='',q=false;t=t.replace(/^\uFEFF/,'');const sep=(t.split('\n')[0].match(/;/g)||[]).length>(t.split('\n')[0].match(/,/g)||[]).length?';':',';

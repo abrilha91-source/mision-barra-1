@@ -1,6 +1,10 @@
 # Misión: Obtener la Barra I
 Práctica de inglés tipo ALCPT (Mesa de Inglés, Esc. Mil. Enfría.). PWA sin servidor: se instala en el celular y funciona sin internet. Se publica vacía; todos los datos viven en el dispositivo de cada usuario.
 
+## v2.7 · Perfil Directora (solo consulta)
+
+Nuevo acceso **Directora**: ve el Centro de mando (Mando, Avance, Estadística, En riesgo, Actividad, ALC, etc.) y una vista de las pantallas del cadete, sin poder generar códigos, cambiar ajustes, importar, borrar ni editar. Administración sigue con el control total. La clave de lectura de la Hoja se captura igual que en Administración (una vez por equipo).
+
 ## v2.6 · Registro automático completo (Hoja de Google)
 - Cada cadete envía solo, sin códigos: ingresos, ejercicios, **resumen de avance** (firmado), **evaluaciones oficiales** (folio, forma, salidas, puntaje) y **resultados ALC / ALCPT / Examen final**.
 - Administración los carga sola al entrar (Mando › Actualizar) en Avance, Estadística, En riesgo, Antigüedad, Áreas, Mando y ALC › Resultados, combinados con los códigos importados.
