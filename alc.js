@@ -1,10 +1,9 @@
-/* Módulo ALC · ALCPT para Misión: Obtener la Barra I (v2.4).
-   Secciones: ALC Parcial 1 y 2, evaluación por semestre y por parcial, Examen final (formas PDF + MP3, hoja de respuestas, clave opcional, tablas de conversión), Calificación, Resultados y Banco.
-   El banco y las formas se importan en cada dispositivo (IndexedDB «mb1_alc»); nada se publica. No modifica los datos de la app (mb1_estado_v2). */
+/* Módulo ALC para Misión: Obtener la Barra I (v2.8).
+   Vista: solo Práctica y Simulacro. El material se conserva en el dispositivo (IndexedDB «mb1_alc») y sigue usándose; no se muestran formas, bancos ni evaluaciones formales.
+   Nada se publica. No modifica los datos de la app (mb1_estado_v2). */
 (function(){'use strict';
-/* ALCPT y ALC por parciales · v2.4 · Esc. Mil. Enfría.
-   La app se publica VACÍA. Se importan en cada dispositivo (IndexedDB):
-   1) banco_alcpt_alc_privado.json  2) formas del Final (PDF original o JSON/CSV) y sus audios (MP3/M4A), que se cargan cuando estén disponibles. */
+/* Práctica y simulacro ALC · v2.8 · Esc. Mil. Enfría.
+   La app se publica VACÍA. El material de práctica se carga en cada dispositivo (IndexedDB) desde Administración › Ajustes. */
 const VER='1.0';
 let ROOT=null,V=null,VIEW='inicio',VARG='';const $=s=>(ROOT||document).querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -12,6 +11,7 @@ const toast=m=>{if(typeof window.toast==='function')return window.toast(m);const
 const fechaL=d=>{const x=new Date(d);return isNaN(x)?String(d).slice(0,10):`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`};
 const hoy=()=>fechaL(new Date());
 const L='ABCD';
+const limpioE=s=>String(s??'').replace(/\s*\((?:Book|Libro)\s*\d+[^)]*\)/gi,'').replace(/\b(?:Book|Libro)\s*\d+(?:\s*,?\s*(?:Lesson|Lecci[oó]n)\s*\d+)?/gi,'').replace(/\s{2,}/g,' ').trim();
 const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},SS=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 /* ---------- almacenamiento ---------- */
 function idb(){return new Promise((ok,ko)=>{const r=indexedDB.open('mb1_alc',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)})}
@@ -36,20 +36,22 @@ const CFG=()=>Object.assign({},ESQ().pond,LS('mb1_alc_cfg_'+esqId(),{}));
 /* semestres ALCPT que corresponden a un curso del esquema */
 function semsDe(c){if(esqId()==='superioridad')return {A1:[1],A2:[2,3],A3:[4,5],A4:[6,7]}[c.id]||[c.n];return [c.n]}
 /* ---------- navegación ---------- */
-const TABS=[['inicio','Inicio'],['alc','ALC · Parcial 1 y 2'],['alcpt','ALCPT · semestre y parcial'],['final','Examen final'],['calif','Calificación'],['resultados','Resultados'],['banco','Banco']];
+const TABS=[['inicio','Inicio'],['practica','Práctica'],['simulacro','Simulacro'],['resultados','Resultados']];
 function go(v){const [a,b]=String(v||'inicio').replace(/^#/,'').split('/');VIEW=a||'inicio';VARG=b||'';render()}
 function nav(){const n=ROOT&&ROOT.querySelector('#alcnav');if(n)n.innerHTML=TABS.map(([k,t])=>`<button type="button" data-v="${k}" class="${VIEW===k?'on':''}">${t}</button>`).join('')}
 function links(){if(!V)return;V.querySelectorAll('a[href^="#"]').forEach(a=>a.onclick=ev=>{ev.preventDefault();go(a.getAttribute('href'))})}
 function render(){if(!V||!document.body.contains(V))return;nav();const h=VIEW;
  if(EX&&h!=='examen'){if(!confirm('¿Salir del examen en curso? Se perderá.')){VIEW='examen';nav();return}EX=null;if(AUD)AUD.pause();if(PISTA){PISTA.el.pause();PISTA=null}speechSynthesis&&speechSynthesis.cancel()}
- ({inicio:vInicio,alcpt:vALCPT,alc:vALC,final:vFinal,calif:vCalif,resultados:vRes,banco:vBanco,examen:vExamen}[h]||vInicio)();links();const top=ROOT.getBoundingClientRect().top+scrollY-70;if(scrollY>top)window.scrollTo(0,Math.max(0,top))}
-const sinBanco=()=>`<div class="card"><h1>Importa el banco</h1><p class="muted">Esta sección se publica <b>vacía</b>. Para usarla, importa el archivo <b>banco_alcpt_alc_privado.json</b>. Se guarda solo en este dispositivo.</p><label class="btn big">Importar banco (.json)<input type="file" class="imp" accept=".json,application/json" hidden></label></div>`;
+ if(['alc','alcpt','final','calif','banco'].includes(h)){VIEW=h==='alc'||h==='alcpt'?'practica':'inicio';nav();h=VIEW}({inicio:vInicio,practica:vPractica,simulacro:vSimulacro,alcpt:vPractica,alc:vPractica,resultados:vRes,examen:vExamen}[h]||vInicio)();links();const top=ROOT.getBoundingClientRect().top+scrollY-70;if(scrollY>top)window.scrollTo(0,Math.max(0,top))}
+const sinBanco=()=>{const adm=ADM()&&!SOLO_LEC();return `<div class="card"><h1>Material de práctica</h1><p class="muted">${adm?'Esta sección se publica vacía. Carga aquí el archivo que entrega la Mesa de Inglés. Se guarda solo en este dispositivo.':'El material de práctica aún no está en este dispositivo. Pídele a tu docente que lo cargue.'}</p>${adm?`<label class="btn big">Cargar material (.json)<input type="file" class="imp" accept=".json,application/json" hidden></label>`:''}</div>`};
 function bindImp(){document.querySelectorAll('input.imp').forEach(i=>i.onchange=importar)}
-function importar(e){if(SOLO_LEC()||!ADM()){alert('Solo Administración puede importar el banco.');e.target.value='';return}const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async()=>{let b;
- try{b=JSON.parse(String(r.result).replace(/^\uFEFF/,''))}catch(x){alert('El archivo no es JSON válido.');return}
- if(!b||b.tipo!=='banco_alcpt_alc'||!Array.isArray(b.alcpt)||!Array.isArray(b.alc)){alert('Este archivo no es un banco ALCPT/ALC. Las formas del Final se cargan en la pestaña «Final».');return}
- BANK=b;try{await idbSet('bank',b)}catch(x){alert('No se pudo guardar en el dispositivo: '+x.message)}
- toast(`Banco v${b.version} importado: ${b.alcpt.length} ALCPT + ${b.alc.length} ALC`);render()};r.readAsText(f)}
+function importar(e){const f=e&&e.target&&e.target.files?e.target.files[0]:e;if(!f||!f.name)return;return importarMaterial(f)}
+function importarMaterial(f){if(SOLO_LEC()||!ADM()){toast('Solo Administración puede cargar el material de práctica.');return Promise.resolve(false)}
+ return new Promise((ok,ko)=>{const r=new FileReader();r.onerror=()=>ko(r.error);r.onload=async()=>{let b;
+  try{b=JSON.parse(String(r.result).replace(/^\uFEFF/,''))}catch(x){alert('El archivo no es JSON válido.');ok(false);return}
+  if(!b||b.tipo!=='banco_alcpt_alc'||!Array.isArray(b.alcpt)||!Array.isArray(b.alc)){alert('Este archivo no es el material de práctica de la Mesa de Inglés.');ok(false);return}
+  BANK=b;try{await idbSet('bank',b)}catch(x){alert('No se pudo guardar en el dispositivo: '+x.message);ok(false);return}
+  toast('Material de práctica listo en este dispositivo.');if(V&&document.body.contains(V))render();ok(true)};r.readAsText(f)})}
 /* ---------- utilidades ---------- */
 function shuffle(a,seed){a=a.slice();let x=seed||Math.random()*1e9|0;const rnd=()=>{x=(x*1103515245+12345)&0x7fffffff;return x/0x7fffffff};for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function seg(name,opts,val){return `<div class="seg" data-k="${name}">${opts.map(([v,t])=>`<button type="button" data-v="${esc(v)}" class="${String(val)===String(v)?'on':''}">${esc(t)}</button>`).join('')}</div>`}
@@ -71,19 +73,33 @@ function armar(f){let p=pool(f);if(!p.length)return [];const n=Math.min(+f.n||p.
 /* ---------- voz ---------- */
 let VOCES=[];function cargarVoces(){VOCES=(speechSynthesis.getVoices()||[]).filter(v=>/^en[-_]US/i.test(v.lang));if(!VOCES.length)VOCES=(speechSynthesis.getVoices()||[]).filter(v=>/^en/i.test(v.lang))}
 if('speechSynthesis'in window){cargarVoces();speechSynthesis.onvoiceschanged=cargarVoces}
-function hablar(txt,fin){if(!('speechSynthesis'in window)){alert('Este navegador no tiene voz. Pide al aplicador que lea el guion.');return}
+function hablar(txt,fin){if(!('speechSynthesis'in window)){alert('Este navegador no tiene voz en inglés. Actívala en Ajustes › Texto a voz.');return}
  speechSynthesis.cancel();const lines=String(txt).replace(/_{2,}/g,' blank ').split('\n').filter(x=>x.trim());const vM=VOCES.find(v=>/male|david|alex|fred|daniel|guy/i.test(v.name)&&!/female/i.test(v.name))||VOCES[0],vW=VOCES.find(v=>/female|samantha|zira|victoria|jenny|aria|karen/i.test(v.name))||VOCES[1]||VOCES[0];
  lines.forEach((l,i)=>{let t=l,v=VOCES[0];const m=l.match(/^\s*([MW]):\s*(.*)$/);if(m){t=m[2];v=m[1]==='M'?vM:vW}const u=new SpeechSynthesisUtterance(t);u.lang='en-US';u.rate=+(localStorage.getItem('mb1_alc_rate')||.9);if(v)u.voice=v;if(i===lines.length-1&&fin)u.onend=fin;speechSynthesis.speak(u)})}
 /* ---------- inicio ---------- */
 function tablaCursos(){const E=ESQ();return `<div class="tw"><table><tr><th>Curso</th><th>Libros ALC</th>${parN()===3?'<th>P1</th><th>P2</th><th>P3</th>':'<th>Parcial 1</th><th>Parcial 2</th>'}<th>Puntaje de referencia</th></tr>${cursos().map(c=>`<tr><td>${esc(c.nombre)}${c.nota==='inferido'?' <span class="mini">(inferido)</span>':''}</td><td>${c.libros.join(', ')}</td>${Array.from({length:parN()},(_,i)=>`<td>Book ${c.libros[i]??'—'}</td>`).join('')}<td>${esc(c.ref||'—')}</td></tr>`).join('')}</table></div><p class="mini">${esc(E.fuente||'')}</p>`}
 function selEsq(){const es=BANK.esquemas||{};if(Object.keys(es).length<2)return `<p class="mini">${esc((es[esqId()]||{}).nombre||'')}</p>`;return `<label class="f">Esquema de la materia</label><select id="esq">${Object.entries(es).map(([k,e])=>`<option value="${k}" ${k===esqId()?'selected':''}>${esc(e.nombre)}</option>`).join('')}</select>`}
 function bindEsq(fn){const s=$('#esq');if(s)s.onchange=()=>{SS('mb1_alc_esq',s.value);F={};fn()}}
+function armarLibre(n,sec,mezcla){let p=mezcla?(BANK.alcpt||[]).concat(BANK.alc||[]):(BANK.alcpt||[]);p=p.filter(it=>!sec||it.sec===sec);if(!p.length)p=(BANK.alc||[]).filter(it=>!sec||it.sec===sec);if(!p.length)return[];const Lp=shuffle(p.filter(i=>i.sec==='L')),Rp=shuffle(p.filter(i=>i.sec==='R'));n=Math.min(+n||p.length,p.length);let nl=sec==='L'?n:sec==='R'?0:Math.min(Lp.length,Math.round(n/2));if(n-nl>Rp.length)nl=n-Rp.length;return Lp.slice(0,nl).concat(Rp.slice(0,n-nl))}
+function iniciarLibre(modo){if(!BANK){toast('El material de práctica aún no está en este dispositivo.');return}const sec=($('#sec')&&$('#sec').value)||'';const n=modo==='practica'?(+($('#n')&&$('#n').value)||20):100;const its=armarLibre(n,sec,modo==='practica');if(!its.length){toast('El material de práctica aún no está en este dispositivo.');return}const nom=(($('#nom')&&$('#nom').value.trim())||nomDef());if($('#nom'))localStorage.setItem('mb1_alc_nom',nom);EX={fuente:'alcpt',c:{alcance:'libre'},modo:modo==='practica'?'practica':'simulacro',nom,its,i:0,r:its.map(()=>null),plays:its.map(()=>0),ini:Date.now()};go('examen')}
 function vInicio(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}
- const r=RES().slice(-5).reverse(),E=ESQ();
- V.innerHTML=`<div class="card"><h1>ALCPT y ALC por parciales</h1><p class="muted">Banco v${esc(BANK.version)} · ${BANK.alc.length} reactivos ALC (Books ${Math.min(...BANK.alc.map(i=>i.libro))}–${Math.max(...BANK.alc.map(i=>i.libro))}) · ${BANK.alcpt.length} reactivos ALCPT${FORMAS.length?` · ${FORMAS.length} formas para el Final`:''}.</p>
- <div class="row"><a class="btn big" href="#alc/p1">ALC · Evaluación Parcial 1</a><a class="btn big" href="#alc/p2">ALC · Evaluación Parcial 2</a></div><a class="btn big ghost" href="#alc">ALC · semestral, por libro o por lección</a><a class="btn big" href="#alcpt">ALCPT · por semestre, parcial o forma</a><a class="btn big" href="#final">Examen final ALCPT · formas y audios originales</a><a class="btn big ghost" href="#calif">Calcular calificación del parcial y final</a></div>
- <div class="card"><h2>Cómo se organiza</h2>${selEsq()}<p class="muted">${E.parciales} parciales por ${esqId()==='superioridad'?'año':'semestre'}; cada parcial evalúa un libro del ALC. ${esqId()==='superioridad'?'Parciales 10 % c/u y final del semestre 70 %.':'Parcial = examen 60 % + portafolio 30 % + participación 10 %. Calificación final = parciales 60 % + ALCPT final 40 %.'}</p>${tablaCursos()}</div>
- <div class="card"><h2>Últimos resultados</h2>${r.length?tablaRes(r):'<p class="muted">Aún no hay resultados en este dispositivo.</p>'}</div>`;bindEsq(vInicio)}
+ const mm=matDef(),r=RES().filter(x=>ADM()||!mm||x.m===mm).slice(-5).reverse();
+ V.innerHTML=`<div class="card"><h1>Práctica ALC</h1><p class="muted">Practica o presenta un simulacro. Es práctica: no es un resultado que cuente.</p>
+ <div class="row"><a class="btn big" href="#practica">Práctica</a><a class="btn big" href="#simulacro">Simulacro</a></div></div>
+ <div class="card"><h2>Últimos resultados</h2>${r.length?tablaRes(r):'<p class="muted">Aún no hay resultados en este dispositivo.</p>'}</div>`}
+function vPractica(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}
+ V.innerHTML=`<div class="card"><h1>Práctica</h1><p class="muted">Respondes y ves de inmediato si acertaste.</p>
+ <div class="row"><div><label class="f">Sección</label><select id="sec"><option value="">Ambas</option><option value="L">Comprensión auditiva</option><option value="R">Lectura y estructura</option></select></div>
+ <div><label class="f">Número de preguntas</label><input type="number" id="n" min="5" max="50" value="20"></div></div>
+ <label class="f">Nombre (opcional, para tu registro)</label><input type="text" id="nom" value="${esc(nomDef())}">
+ <button class="btn big" id="go">Comenzar práctica</button></div>`;
+ $('#go').onclick=()=>iniciarLibre('practica')}
+function vSimulacro(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}
+ V.innerHTML=`<div class="card"><h1>Simulacro</h1><p class="muted">Preguntas de comprensión auditiva y de lectura, con revisión al final. Es práctica: no es un resultado que cuente.</p>
+ <label class="f">Sección</label><select id="sec"><option value="">Completo</option><option value="L">Solo comprensión auditiva</option><option value="R">Solo lectura y estructura</option></select>
+ <label class="f">Nombre (opcional, para tu registro)</label><input type="text" id="nom" value="${esc(nomDef())}">
+ <button class="btn big" id="go">Iniciar simulacro</button></div>`;
+ $('#go').onclick=()=>iniciarLibre('simulacro')}
 /* ---------- selección ALC / ALCPT ---------- */
 let F={};
 function filtros(fuente){return F[fuente]||(F[fuente]={fuente,alcance:'parcial',curso:cursos()[0].id,par:'1',libro:'',lec:'',comp:true,forma:'A',sec:'',tipo:'',n:fuente==='alc'?'30':'50',modo:'examen',acum:false})}
@@ -257,26 +273,24 @@ let EX=null,PISTA=null,AUD=null;
 async function tocar(fid,n){if(AUD){AUD.pause();URL.revokeObjectURL(AUD.src)}const u=await audioURL(fid,n);if(!u){toast('No se encontró el audio');return}AUD=new Audio(u);AUD.play().catch(()=>toast('Toca de nuevo para reproducir'))}
 function iniciar(fuente,f,nom){const its=armar(f);if(!its.length){alert('No hay reactivos con esos filtros.');return}
  const c=curso(f.curso);EX={fuente,c:{alcance:f.alcance,curso:f.curso,cursoNom:c.nombre,par:f.alcance==='parcial'?f.par:'',acum:f.acum,forma:f.alcance==='forma'?f.forma:'',libro:f.alcance==='libro'?f.libro:'',lec:f.lec,libros:librosEval(f)},modo:f.modo,nom,its,i:0,r:its.map(()=>null),plays:its.map(()=>0),ini:Date.now()};go('examen')}
-function evalTxt(e){const c=e.c;if(e.fuente==='final')return `Final · ${c.titulo}${c.parte?(c.parte==='L'?' (auditiva)':' (lectura)'):''}`;
- if(c.forma)return `Forma ${c.forma}`;if(c.alcance==='libro')return `Book ${c.libro}${c.lec?' · L'+c.lec:''}`;
- return (c.par?`Parcial ${c.par}${c.acum?' acum.':''}`:(esqId()==='superioridad'?'Anual':'Semestral'))+(e.fuente==='alc'&&c.libros?` · Book ${c.libros.join(', ')}`:'')+(c.lec?' · L'+c.lec:'')}
-function titulo(e){return `${e.fuente==='alc'?'ALC':'ALCPT'} · `+(e.c.forma||e.fuente==='final'||e.c.alcance==='libro'?'':esc(e.c.cursoNom||'')+' · ')+evalTxt(e)}
+function evalTxt(e){return e.modo==='practica'?'Práctica':'Simulacro'}
+function titulo(e){return evalTxt(e)}
 function vExamen(){if(!EX){go('inicio');return}if(EX.hoja){vHoja();return}const e=EX,it=e.its[e.i],ans=e.r[e.i],prac=e.modo==='practica',done=prac&&ans!==null&&it.k!=null;
  const parte=it.sec==='L'?'Parte I · Comprensión auditiva':'Parte II · Lectura y estructura';const ofi=it.sec==='L'&&!it.s&&!it.aud;
  V.innerHTML=`<div class="card"><div class="hud"><span>${titulo(e)}</span><span>${e.i+1} / ${e.its.length}</span></div><div class="pbar"><i style="width:${100*(e.i+1)/e.its.length}%"></i></div>
- <span class="tag">${parte}</span><span class="tag">${esc(it.tipo)}</span>${it.libro?`<span class="tag">Book ${it.libro}${it.leccion?' · L'+it.leccion:''}</span>`:''}${e.fuente==='final'?`<span class="tag">Reactivo ${it.n}${it.bis?' bis':''}</span>`:''}${it.k==null?'<span class="tag" style="background:#FBE3E0;color:#b3261e">sin clave</span>':''}
- ${e.fuente==='final'&&e.c.pista&&it.sec==='L'?`<div class="txt">🔊 <b>Pista completa</b> (el aplicador la controla)<audio controls preload="auto" id="pista" style="width:100%;margin-top:6px"></audio></div>`:''}${it.sec==='L'&&(it.s||it.aud)?`<div class="noprint"><button class="btn" id="play">▶ Escuchar${!prac?` (${2-e.plays[e.i]} restantes)`:''}</button></div>${done?`<div class="txt">${esc(it.s)}</div>`:''}`:ofi?`<div class="txt">🔊 <b>Audio:</b> ${e.c.pista?'reproduce la pista completa':'el aplicador reproduce el audio'} del reactivo ${it.n||e.i+1}.</div>`:it.s?`<div class="txt">${esc(it.s)}</div>`:''}
+ <span class="tag">${parte}</span>
+ ${e.fuente==='final'&&e.c.pista&&it.sec==='L'?`<div class="txt">🔊 <b>Pista completa</b> (el aplicador la controla)<audio controls preload="auto" id="pista" style="width:100%;margin-top:6px"></audio></div>`:''}${it.sec==='L'&&(it.s||it.aud)?`<div class="noprint"><button class="btn" id="play">▶ Escuchar${!prac?` (${2-e.plays[e.i]} restantes)`:''}</button></div>${done?`<div class="txt">${esc(it.s)}</div>`:''}`:ofi?`<div class="txt">🔊 <b>Audio:</b> escucha y elige la mejor respuesta.</div>`:it.s?`<div class="txt">${esc(it.s)}</div>`:''}
  ${it.q?`<div class="q">${esc(it.q)}</div>`:''}
  ${it.o.map((o,j)=>`<button class="op ${ans===j?'sel':''} ${done&&j===it.k?'ok':''} ${done&&ans===j&&j!==it.k?'no':''}" data-j="${j}" ${done?'disabled':''}><b>${L[j]})</b>${esc(o)}</button>`).join('')}
- ${done?`<div class="fb ${ans===it.k?'ok':'no'}"><b>${ans===it.k?'Correcto':'Incorrecto · respuesta: '+L[it.k]}</b><br>${esc(it.e)}</div>`:''}
- <div class="row" style="margin-top:10px"><button class="btn ghost" id="prev" ${e.i?'':'disabled'}>Anterior</button>${e.i<e.its.length-1?`<button class="btn" id="next">Siguiente</button>`:`<button class="btn" id="fin">Terminar y calificar</button>`}</div>
+ ${done?`<div class="fb ${ans===it.k?'ok':'no'}"><b>${ans===it.k?'Correcto':'Incorrecto · respuesta: '+L[it.k]}</b><br>${esc(limpioE(it.e))}</div>`:''}
+ <div class="row" style="margin-top:10px"><button class="btn ghost" id="prev" ${e.i?'':'disabled'}>Anterior</button>${e.i<e.its.length-1?`<button class="btn" id="next">Siguiente</button>`:`<button class="btn" id="fin">Terminar</button>`}</div>
  <p class="mini">Respondidas: ${e.r.filter(x=>x!==null).length} de ${e.its.length}. <a href="#" id="abort">Cancelar</a></p></div>`;
  V.querySelectorAll('.op').forEach(b=>b.onclick=()=>{e.r[e.i]=+b.dataset.j;vExamen();if(prac&&it.k!=null&&window.FX){if(e.r[e.i]===it.k)FX.ok(V.querySelector('.op.ok'));else FX.no()}});
  const ps=$('#pista');if(ps){if(PISTA&&PISTA.fid===e.c.fid){ps.replaceWith(PISTA.el);PISTA.el.id='pista'}else audioURL(e.c.fid,null).then(u=>{if(u){ps.src=u;PISTA={fid:e.c.fid,el:ps}}})}
  const p=$('#play');if(p)p.onclick=()=>{if(!prac&&e.plays[e.i]>=2){toast('Ya no quedan reproducciones');return}e.plays[e.i]++;if(it.aud)tocar(e.c.fid,it.n);else hablar(it.s);if(!prac)p.textContent=`▶ Escuchar (${2-e.plays[e.i]} restantes)`};
  $('#prev').onclick=()=>{e.i--;vExamen()};const n=$('#next');if(n)n.onclick=()=>{e.i++;vExamen()};
  const f=$('#fin');if(f)f.onclick=()=>{const pend=e.r.filter(x=>x===null).length;if(pend&&!confirm(`Faltan ${pend} sin responder (cuentan como error). ¿Terminar?`))return;calificar()};
- $('#abort').onclick=ev=>{ev.preventDefault();if(confirm('¿Cancelar este examen?')){const fu=e.fuente;EX=null;if(AUD)AUD.pause();if(PISTA)PISTA.el.pause();PISTA=null;speechSynthesis&&speechSynthesis.cancel();go(fu==='final'?'final':fu)}}}
+ $('#abort').onclick=ev=>{ev.preventDefault();if(confirm('¿Cancelar?')){const mo=e.modo;EX=null;if(AUD)AUD.pause();if(PISTA)PISTA.el.pause();PISTA=null;speechSynthesis&&speechSynthesis.cancel();go(mo==='practica'?'practica':'simulacro')}}}
 function calificar(){const e=EX,cfg=CFG();let ok=0;const por={};const its=e.its.filter(i=>i.k!=null),idx=e.its.map((it,j)=>j).filter(j=>e.its[j].k!=null);
  idx.forEach(j=>{const it=e.its[j],b=e.r[j]===it.k;ok+=b;const k=it.tipo;por[k]=por[k]||[0,0];por[k][0]+=b;por[k][1]++});
  const sec={L:[0,0],R:[0,0]};idx.forEach(j=>{const it=e.its[j];sec[it.sec][0]+=e.r[j]===it.k;sec[it.sec][1]++});
@@ -286,11 +300,10 @@ function calificar(){const e=EX,cfg=CFG();let ok=0;const por={};const its=e.its.
  res.m=matDef()||'';if(e.mat)res.m=e.mat;if(!PIL()){const all=RES();all.push(res);setRES(all);try{window.MB1SYNC&&MB1SYNC.alc(res)}catch(er){}}
  const r=e.r,lst=e.its;const titu=titulo(e);EX=null;if(AUD)AUD.pause();if(PISTA){PISTA.el.pause();PISTA=null}VIEW='resultados';nav();
  V.innerHTML=`<div class="card"><h1>Resultado</h1><p class="muted">${titu}${res.nom?' · '+esc(res.nom):''}</p>
- <div class="row"><div><div class="big">${ok}/${its.length}</div><div class="muted">aciertos${res.sinClave?` (${res.sinClave} sin clave no cuentan)`:''}</div></div><div><div class="big">${pct}</div><div class="muted">porcentaje</div></div><div><div class="big ${cal>=cfg.minima?'okt':'badt'}">${cal.toFixed(1)}</div><div class="muted">calificación (0–10) · ${cal>=cfg.minima?'Aprobado':'No aprobado'} (mínima ${cfg.minima})</div></div></div>${conv?`<p class="mini">${esc(conv)}</p>`:''}
+ <div class="row"><div><div class="big">${ok}/${its.length}</div><div class="muted">aciertos</div></div><div><div class="big">${pct}</div><div class="muted">porcentaje</div></div></div>
  <h3>Por sección</h3><p>${['L','R'].filter(s=>sec[s][1]).map(s=>`<span class="tag">${s==='L'?'Comprensión auditiva':'Lectura y estructura'}: ${sec[s][0]}/${sec[s][1]}</span>`).join('')}</p>
- <h3>Por tipo</h3><p>${Object.entries(por).map(([k,v])=>`<span class="tag">${esc(k)}: ${v[0]}/${v[1]}</span>`).join('')}</p>
- <div class="row noprint"><button class="btn" onclick="print()">Imprimir</button><a class="btn ghost" href="#calif">Ir a la calificación</a></div></div>
- ${!ADM()&&e.fuente==='final'&&e.modo==='examen'?'':`<div class="card"><h2>Revisión de errores</h2>${lst.map((it,j)=>it.k==null||r[j]===it.k?'':`<div style="border-bottom:1px solid var(--b);padding:8px 0"><b>${it.n?it.n:j+1}.</b> ${it.s?`<div class="txt">${esc(it.s)}</div>`:''}<div><b>${esc(it.q)}</b></div><div class="badt">Respuesta: ${r[j]===null?'(sin responder)':L[r[j]]+') '+esc(it.o[r[j]])}</div><div class="okt">Correcta: ${L[it.k]}) ${esc(it.o[it.k])}</div><div class="mini">${esc(it.e)}</div></div>`).join('')||'<p>¡Sin errores!</p>'}</div>`}`;
+ <div class="row noprint"><button class="btn" onclick="print()">Imprimir</button><a class="btn ghost" href="#${e.modo==='practica'?'practica':'simulacro'}">Volver</a></div></div>
+ ${!ADM()&&e.fuente==='final'&&e.modo==='examen'?'':`<div class="card"><h2>Revisión de errores</h2>${lst.map((it,j)=>it.k==null||r[j]===it.k?'':`<div style="border-bottom:1px solid var(--b);padding:8px 0"><b>${it.n?it.n:j+1}.</b> ${it.s?`<div class="txt">${esc(it.s)}</div>`:''}<div><b>${esc(it.q)}</b></div><div class="badt">Respuesta: ${r[j]===null?'(sin responder)':L[r[j]]+') '+esc(it.o[r[j]])}</div><div class="okt">Correcta: ${L[it.k]}) ${esc(it.o[it.k])}</div><div class="mini">${esc(limpioE(it.e))}</div></div>`).join('')||'<p>¡Sin errores!</p>'}</div>`}`;
  SS('mb1_alc_ultimo',res);if(window.FX&&cal>=cfg.minima)FX.fin(cal>=9?200:130)}
 /* ---------- calificación ---------- */
 function vCalif(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}const cfg=CFG(),u=LS('mb1_alc_ultimo',null),d=LS('mb1_alc_calc_'+esqId(),{}),np=parN(),sup=esqId()==='superioridad';
@@ -316,18 +329,19 @@ function vCalif(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}const cfg=CF
  V.querySelectorAll('input[id],select#tb').forEach(i=>i.oninput=i.onchange=calc);
  V.querySelectorAll('[data-cfg]').forEach(i=>i.onchange=()=>{const o=LS('mb1_alc_cfg_'+esqId(),{});o[i.dataset.cfg]=parseFloat(i.value);SS('mb1_alc_cfg_'+esqId(),o);vCalif()});calc()}
 /* ---------- resultados ---------- */
-function tablaRes(a){const m=CFG().minima;return `<div class="tw"><table><tr><th>Fecha</th><th>Cadete</th><th>Prueba</th><th>Curso</th><th>Evaluación</th><th>Modo</th><th>Aciertos</th><th>%</th><th>Cal.</th></tr>${a.map(r=>`<tr><td>${fechaL(r.fecha)}</td><td>${esc(r.nom||'—')}</td><td>${r.fuente==='final'?'FINAL':r.fuente.toUpperCase()}</td><td>${esc(r.curso||r.sem||'—')}</td><td>${esc(r.eval)}</td><td>${r.modo==='examen'?'Examen':'Práctica'}</td><td>${r.ok}/${r.n}</td><td>${r.pct}</td><td class="${r.cal>=m?'okt':'badt'}">${r.cal.toFixed(1)}</td></tr>`).join('')}</table></div>`}
+function tipoRes(r){return r.modo==='practica'?'Práctica':'Simulacro'}
+function tablaRes(a){return `<div class="tw"><table><tr><th>Fecha</th><th>Cadete</th><th>Tipo</th><th>Aciertos</th><th>%</th></tr>${a.map(r=>`<tr><td>${fechaL(r.fecha)}</td><td>${esc(r.nom||'—')}</td><td>${tipoRes(r)}</td><td>${r.ok}/${r.n}</td><td>${r.pct}</td></tr>`).join('')}</table></div>`}
 function vRes(){vRes0();if(!ADM())V.querySelectorAll('.adm').forEach(x=>x.remove())}
 function vRes0(){const mm=matDef(),a=RES().filter(r=>ADM()||r.m===mm).slice().reverse();
- V.innerHTML=`<div class="card"><h1>Resultados</h1><p class="muted">${ADM()?'Incluye los de este dispositivo y los que llegan solos de la Hoja de registro (Actualizar en Mando).':'Se guardan en este dispositivo y se envían solos a la Mesa de Inglés.'}</p>${a.length?tablaRes(a):'<p>Aún no hay resultados.</p>'}
+ V.innerHTML=`<div class="card"><h1>Resultados</h1><p class="muted">${ADM()?'Se guardan en este dispositivo.':'Se guardan en este dispositivo.'}</p>${a.length?tablaRes(a):'<p>Aún no hay resultados.</p>'}
  <div class="row noprint"><button class="btn" id="csv" ${a.length?'':'disabled'}>Exportar CSV</button><button class="btn ghost" onclick="print()">Imprimir</button><button class="btn peligro adm" id="del" ${a.length?'':'disabled'}>Borrar resultados</button></div></div>
- ${a.length?`<div class="card"><h2>Promedios (solo exámenes)</h2>${resumen(a)}</div>`:''}`;
- $('#csv').onclick=()=>{const h=['Fecha','Cadete','Prueba','Esquema','Curso','Parcial','Forma','Evaluación','Modo','Reactivos calificados','Sin clave','Aciertos','Porcentaje','Calificación','Auditiva','Lectura','Minutos'];
-  const rows=RES().map(r=>[r.fecha,r.nom,r.fuente.toUpperCase(),r.esq||'',r.curso||r.sem,r.par,r.forma,r.eval,r.modo,r.n,r.sinClave||0,r.ok,r.pct,r.cal,r.L?r.L.join('/'):'',r.R?r.R.join('/'):'',r.min]);
+ ${a.length?`<div class="card"><h2>Promedios</h2>${resumen(a)}</div>`:''}`;
+ $('#csv').onclick=()=>{const h=['Fecha','Cadete','Tipo','Aciertos','Porcentaje','Minutos'];
+  const rows=RES().map(r=>[r.fecha,r.nom,tipoRes(r),r.ok,r.pct,r.min]);
   const csv='\uFEFF'+[h,...rows].map(x=>x.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');const l=document.createElement('a');l.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));l.download='resultados_alcpt_alc_'+hoy()+'.csv';l.click()};
  $('#del').onclick=()=>{if(confirm('¿Borrar todos los resultados de este dispositivo?')){setRES([]);vRes()}}}
-function resumen(a){const g={};a.filter(r=>r.modo==='examen').forEach(r=>{const k=`${r.fuente.toUpperCase()}|${r.curso||r.sem||'—'}|${r.eval}`;(g[k]=g[k]||[]).push(r.cal)});
- const ks=Object.keys(g).sort();return ks.length?`<div class="tw"><table><tr><th>Prueba</th><th>Curso</th><th>Evaluación</th><th>Exámenes</th><th>Promedio</th></tr>${ks.map(k=>{const [f,s,e]=k.split('|'),v=g[k];return `<tr><td>${f}</td><td>${esc(s)}</td><td>${esc(e)}</td><td>${v.length}</td><td>${(v.reduce((x,y)=>x+y,0)/v.length).toFixed(1)}</td></tr>`}).join('')}</table></div>`:'<p class="muted">Sin exámenes todavía.</p>'}
+function resumen(a){const g={};a.forEach(r=>{const k=tipoRes(r);(g[k]=g[k]||[]).push(r.pct)});
+ const ks=Object.keys(g).sort();return ks.length?`<div class="tw"><table><tr><th>Tipo</th><th>Ejercicios</th><th>Promedio %</th></tr>${ks.map(k=>{const v=g[k];return `<tr><td>${esc(k)}</td><td>${v.length}</td><td>${Math.round(v.reduce((x,y)=>x+y,0)/v.length)}</td></tr>`}).join('')}</table></div>`:'<p class="muted">Aún no hay resultados.</p>'}
 /* ---------- banco ---------- */
 function vBanco(){vBanco0();if(!ADM())V.querySelectorAll('.adm').forEach(x=>x.remove())}
 function vBanco0(){const cnt=(src,f)=>pool(Object.assign({fuente:src,sec:'',tipo:''},f)).length;
@@ -347,5 +361,5 @@ let CARGA=null;function cargar(){if(CARGA)return CARGA;CARGA=(window.indexedDB?P
 let SESK=null;function mount(el){const sk=(()=>{const x=SES();return x?x.perfil+'|'+x.m:''})();if(sk!==SESK){SESK=sk;if(EX){EX=null;if(AUD)AUD.pause();if(PISTA){PISTA.el.pause();PISTA=null}}VIEW='inicio';VARG='';F={}}ROOT=el;el.innerHTML=`<div class="alc-tabs" id="alcnav"></div><div id="alcv" class="alc-v"><section class="card"><p class="mini">Cargando…</p></section></div>`;V=el.querySelector('#alcv');
  el.querySelector('#alcnav').onclick=ev=>{const b=ev.target.closest('button[data-v]');if(b)go(b.dataset.v)};cargar().then(()=>{if(ROOT===el)render()})}
 function agregarRes(l){const all=RES(),k=r=>(r.m||'')+'|'+r.fecha,s=new Set(all.map(k));let n=0;(l||[]).forEach(r=>{if(!r||!r.fecha||s.has(k(r)))return;s.add(k(r));all.push(r);n++});if(n){all.sort((x,y)=>String(x.fecha).localeCompare(String(y.fecha)));setRES(all)}return n}
-window.ALCMOD={mount,VER,go,agregarRes,estado:()=>({bank:!!BANK,formas:FORMAS.length,view:VIEW,examen:!!EX})};
+window.ALCMOD={mount,VER,go,agregarRes,importarMaterial,tieneMaterial:()=>!!BANK,estado:()=>({bank:!!BANK,formas:FORMAS.length,view:VIEW,examen:!!EX})};
 })();
