@@ -3,4 +3,4 @@ Aplicación de práctica de inglés de la Mesa de Inglés (Esc. Mil. Enfría.). 
 
 Incluye práctica diaria, técnicas de estudio, simulacros con tiempo, competencia entre compañeros y seguimiento de avance para la coordinación.
 
-Versión 2.9.
+Versión 2.10.

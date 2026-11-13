@@ -1,6 +1,6 @@
 'use strict';
 /* Misión: Obtener la Barra I — versión PWA (sin servidor). Datos solo en este dispositivo. */
-const VER = '2.9';
+const VER = '2.10';
 // Firma: en el servidor de intranet la entrega /config.js (clave aleatoria por instalación, solo en la red local).
 // En la versión pública no hay clave secreta: es una suma de verificación pública (detecta errores de copia, no falsificación).
 const SECRET = window.MB1_FIRMA || 'MB1-PUBLICO-v2.3.1';
@@ -169,7 +169,7 @@ async function cargarActividad() { if (!SRV && SHEET) return cargarHoja(); const
 
 /* ---------- arranque / login ---------- */
 function render() { if (S.sesion && esMando() && !SRV && SHEET) { const sk = S.sesion.m + '|' + S.sesion.nombre; if (HOJAD.k !== sk) { HOJAD.k = sk; HOJAD.n = null; HOJAD.err = 'cargando'; setTimeout(() => cargarHojaDatos().then(() => { if (S.sesion && esMando() && tab !== 'alc') render(); }), 300); } } render0(); const m = document.getElementById('alcmod'); if (m && window.ALCMOD) window.ALCMOD.mount(m); if (window.FX) { FX.tema(S.tema); FX.vista((S.sesion ? S.sesion.perfil + '|' + S.sesion.m : 'login') + '|' + tab + '|' + loginPerfil); } }
-function render0() { document.body.dataset.tema = S.tema; const app = $('#app'); if (!S.sesion) return app.innerHTML = vLogin(); if (esMando()) return app.innerHTML = vMando(); if (S.sesion.vistaCadete) return app.innerHTML = vUsuario(); if (!P()) { S.sesion = null; return render0(); } app.innerHTML = vUsuario(); }
+function render0() { document.body.dataset.tema = S.tema; const app = $('#app'); if (!S.sesion) { app.innerHTML = vLogin(); return; } if (esMando()) { app.innerHTML = vMando(); return; } if (S.sesion.vistaCadete) { app.innerHTML = vUsuario(); if (window.MB1AUD) MB1AUD.bindAudioUI(app); return; } if (!P()) { S.sesion = null; return render0(); } app.innerHTML = vUsuario(); if (window.MB1AUD) MB1AUD.bindAudioUI(app); }
 let loginPerfil = 'cadete';
 /* v2.5: el perfil Planta ya no se ofrece. Si quedó una sesión de planta abierta, se cierra (sus datos se conservan sin cambios). */
 if (S.sesion && S.sesion.perfil === 'planta') { S.sesion = null; save(); }
@@ -246,6 +246,11 @@ function vHoy(p) {
   <section class="card"><h3>Técnica del día · ${esc(tec[0])}</h3><p>${esc(tec[1])}</p></section>
   <section class="row2"><button class="tile" onclick="iniciarTarjetas()"><b>Tarjetas</b><span>${tarjetasPendientes(p).length} por repasar</span></button><button class="tile" onclick="tab='sombra';render()"><b>Competencia</b><span>${ranking.length > 1 ? ranking.map((r, i) => `${i + 1}. ${esc(r.n.split(' ')[0])} ${r.w}`).join(' · ') : 'Esta semana: ' + w[1] + ' aciertos'}</span></button></section>
   <section class="card"><h3>Insignias</h3><div class="badges">${INSIGNIAS.map(([k, l]) => `<span class="${p.ins[k] ? 'on' : ''}">${p.ins[k] ? '🏅' : '○'} ${l}</span>`).join('')}</div></section>
+  <section class="card" id="audio-cfg"><h3>Audio</h3>
+  <p class="mini">Las preguntas de comprensión auditiva usan grabaciones. Si no hay grabación, se lee con la voz en inglés de este dispositivo. Cambiar la voz solo afecta esas lecturas, no las grabaciones. Hay una pausa breve al inicio para que se oiga completa la pregunta.</p>
+  <label>Voz en inglés<select id="vozsel">${window.MB1AUD?MB1AUD.opcionesVoz():'<option value="">Voz del dispositivo</option>'}</select></label>
+  <label>Velocidad<select id="ratesel">${[[.8,'Lenta'],[.9,'Normal'],[1,'Rápida']].map(([v,l])=>`<option value="${v}" ${window.MB1AUD&&MB1AUD.rateGuardada(.9)===v?'selected':''}>${l}</option>`).join('')}</select></label>
+  <button class="btn ghost" type="button" id="probarvoz">Probar voz</button></section>
   <section class="card"><h3>Enviar mi avance</h3><p class="mini">Genera tu código y envíalo a la Mesa de Inglés (por WhatsApp). El más reciente reemplaza al anterior.</p>
   <div class="row"><button class="btn" id="btnav" onclick="enviarAvance()">Generar código</button><button class="btn ghost" onclick="salir()">Cerrar sesión</button></div><div id="avout"></div></section>`;
 }
@@ -305,9 +310,11 @@ function vAplicar() { const a = paseActivo(); if (!a) return '<section class="ca
 let Q = null;
 const akey = t => b32(hash(String(t).trim()), 8);
 let AUD = null;
-function hablarVoz(t, rate) { if (!('speechSynthesis' in window)) return toast('No hay audio para esta pregunta en este equipo.'); speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'en-US'; u.rate = rate; const vs = speechSynthesis.getVoices(); const v = vs.find(v => /^en[-_]US/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)); if (v) u.voice = v; speechSynthesis.speak(u); }
-function hablar(t, rate = .9) { const k = akey(t); if (AUD) { AUD.pause(); AUD = null; } window.speechSynthesis && speechSynthesis.cancel();
-  if (window.AUDIOS && window.AUDIOS[k]) { AUD = new Audio('audio/' + k + '.mp3'); AUD.playbackRate = rate < .8 ? .72 : 1; AUD.play().catch(() => hablarVoz(t, rate)); return; } hablarVoz(t, rate); }
+function pararAudio() { if (AUD) { try { AUD.pause(); AUD.removeAttribute('src'); } catch (e) { } AUD = null; } if (window.MB1AUD) MB1AUD.cancelar(); else if (window.speechSynthesis) speechSynthesis.cancel(); }
+function hablarVoz(t, rate) { if (!('speechSynthesis' in window)) return toast('No hay audio para esta pregunta en este equipo.'); pararAudio(); if (window.MB1AUD) return MB1AUD.speak(t, { rate: rate == null ? MB1AUD.rateGuardada(.9) : rate }); speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'en-US'; u.rate = rate; const vs = speechSynthesis.getVoices(); const v = vs.find(v => /^en[-_]US/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)); if (v) u.voice = v; speechSynthesis.speak(u); }
+function hablar(t, rate) { const k = akey(t); const r = rate == null ? (window.MB1AUD ? MB1AUD.rateGuardada(.9) : .9) : rate; pararAudio();
+  if (window.AUDIOS && window.AUDIOS[k] && window.MB1AUD) { MB1AUD.playFile('audio/' + k + '.mp3', { rate: r < .8 ? .72 : 1, onFail: () => hablarVoz(t, r) }).then(el => { AUD = el; }).catch(() => hablarVoz(t, r)); return; }
+  if (window.AUDIOS && window.AUDIOS[k]) { AUD = new Audio('audio/' + k + '.mp3'); AUD.playbackRate = r < .8 ? .72 : 1; AUD.play().catch(() => hablarVoz(t, r)); return; } hablarVoz(t, r); }
 function iniciar(modo) {
   if (S.sesion && (S.sesion.vistaCadete || (P() && P().vistaSolo))) return toast('Vista de consulta: no se guarda práctica.');
   const p = P(); let ids, opt = { modo, fb: true, tiempo: 0 };
@@ -351,8 +358,8 @@ function pintarQ() {
 }
 function play() { const pl = Q.plays[Q.i] || 0; if (Q.oficial && pl >= 2) return; Q.plays[Q.i] = pl + 1; hablar(Q.items[Q.i].it.au); if (Q.oficial) pintarQ(); }
 function responder(o) { if (Q.fb && Q.resp[Q.i] != null) return; Q.resp[Q.i] = o; if (Q.fb) { registrar(P(), Q.items[Q.i].it, o === 0); save(); } pintarQ(); if (Q.fb && window.FX) { if (o === 0) FX.ok(); else FX.no(); } if (!Q.fb && Q.i < Q.items.length - 1) setTimeout(() => { if (Q) mover(1); }, 220); }
-function mover(d) { Q.i = Math.max(0, Math.min(Q.items.length - 1, Q.i + d)); window.speechSynthesis && speechSynthesis.cancel(); if (AUD) AUD.pause(); pintarQ(); }
-function limpiarQ() { clearInterval(Q.timer); window.removeEventListener('blur', salida); document.removeEventListener('visibilitychange', visib); document.removeEventListener('fullscreenchange', fsch); if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); window.speechSynthesis && speechSynthesis.cancel(); if (AUD) AUD.pause(); }
+function mover(d) { Q.i = Math.max(0, Math.min(Q.items.length - 1, Q.i + d)); pararAudio(); pintarQ(); }
+function limpiarQ() { clearInterval(Q.timer); window.removeEventListener('blur', salida); document.removeEventListener('visibilitychange', visib); document.removeEventListener('fullscreenchange', fsch); if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); pararAudio(); }
 function abandonar() { if (Q.oficial) { if (!confirm('Salir entrega la evaluación tal como está. ¿Entregar?')) return; return terminar(); } if (Object.keys(Q.resp).length && !Q.fb && !confirm('¿Salir sin entregar?')) return; limpiarQ(); if (Q.fb && Object.keys(Q.resp).length) actividad(Q, nomModo(Q.modo) + ' (incompleta)', temaModo(Q.modo, Q), Date.now() - Q.ini); Q = null; render(); }
 function terminar() {
   const q = Q, of = q.oficial; q.oficial = false; limpiarQ(); const p = P(); let ok = 0;
@@ -518,7 +525,7 @@ function restaurar(inp) { if (bloquearEscritura('Solo Administración puede rest
 
 window.addEventListener('popstate', () => { if (Q && Q.oficial) { history.pushState({ q: 1 }, ''); salida(); } });
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js');
-if (window.speechSynthesis) speechSynthesis.getVoices();
+if (window.MB1AUD) MB1AUD.cargarVoces(); else if (window.speechSynthesis) speechSynthesis.getVoices();
 window.__mb1 = { byId, akey, S: () => S, codigoEval, generaPase, validaPase, folio, codigoAvance, leerCodigos, forma, BANCO, importar, iniciar, P };
 render();
 
@@ -542,7 +549,7 @@ function finPiloto() { if (esPiloto() || REAL) salirSandbox(); cerrarGuion(); lo
 const AYUDA = {
   cadete: ['Cadete', `<h3>Entrada</h3><ol><li>Abre el enlace de la aplicación que comparte tu docente.</li><li>Elige <b>Cadete</b>, escribe tu nombre completo (como en la lista oficial) y tu matrícula.</li><li>Elige año, compañía, grupo pedagógico y grupo de inglés.</li><li>Escribe el código de acceso que te dio la Mesa de Inglés y oprime <b>Entrar</b>.</li></ol><p class="mini">Usa siempre el mismo equipo y navegador: tu práctica se guarda ahí. Instálala: Android › menú ⋮ › Agregar a pantalla principal; iPhone › Compartir › Agregar a inicio. Después funciona sin internet.</p>
   <h3>Primer día</h3><p>En Hoy oprime <b>Descubre tu nivel</b> (12 preguntas, unos 8 min, sin calificación). Con 20 respuestas aparece tu puntaje estimado. Metas de egreso: 1/er. año 42 · 2/o. 48 · 3/er. 54 · 4/o. 60 (Barra I). El estimado no es un resultado oficial.</p>
-  <h3>Uso diario (10 a 15 min)</h3><ol><li>Hoy › <b>Misión de hoy</b>: 8 preguntas con tu tema más débil y tus errores.</li><li>Hoy › <b>Tarjetas</b>: unos 5 minutos de repaso.</li><li>Practicar › <b>Listening rápido</b>: 5 audios. El listening vale la mitad del simulacro.</li></ol><p class="mini">Escuchar reproduce el audio con la voz en inglés de tu equipo; Lento lo repite despacio. Usa audífonos.</p>
+  <h3>Uso diario (10 a 15 min)</h3><ol><li>Hoy › <b>Misión de hoy</b>: 8 preguntas con tu tema más débil y tus errores.</li><li>Hoy › <b>Tarjetas</b>: unos 5 minutos de repaso.</li><li>Practicar › <b>Listening rápido</b>: 5 audios. El listening vale la mitad del simulacro.</li></ol><p class="mini">Escuchar reproduce la grabación de la pregunta (si no hay grabación, la voz en inglés de este dispositivo). Hay una pausa breve al inicio. Lento lo repite despacio. En Hoy puedes cambiar la voz de las lecturas (no cambia las grabaciones). Usa audífonos.</p>
   <h3>Simulacro</h3><ol><li>En <b>Simulacro</b> puedes hacer un ejercicio corto (20 preguntas, 15 min) o un simulacro completo (100 preguntas, 70 min).</li><li>Al terminar ves tu porcentaje y puedes revisar. Es práctica: no es un resultado oficial.</li></ol>
   <h3>Envío de tu avance</h3><p>La coordinación no ve tu práctica hasta que envías tu código de avance (empieza con “MB1.”). Si aparece el recuadro naranja “Tu coordinadora todavía no ve tu práctica”, oprime <b>Generar mi código de avance</b> › Copiar o WhatsApp y envíalo completo. El más reciente reemplaza al anterior.</p>
   <h3>Mi sombra y competencia</h3><p>Asigna a tu pareja de estudio con su nombre y matrícula y una meta semanal compartida. Pega los códigos MB1 de tus compañeros para ver la competencia semanal por antigüedad, grupo o compañía.</p>

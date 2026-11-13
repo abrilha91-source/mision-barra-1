@@ -71,11 +71,12 @@ function armar(f){let p=pool(f);if(!p.length)return [];const n=Math.min(+f.n||p.
  if(f.alcance==='forma'&&(!+f.n||+f.n>=p.length))sel=p.slice().sort((a,b)=>a.sec===b.sec?a.id.localeCompare(b.id):a.sec==='L'?-1:1);
  return sel.sort((a,b)=>a.sec===b.sec?0:a.sec==='L'?-1:1)}
 /* ---------- voz ---------- */
-let VOCES=[];function cargarVoces(){VOCES=(speechSynthesis.getVoices()||[]).filter(v=>/^en[-_]US/i.test(v.lang));if(!VOCES.length)VOCES=(speechSynthesis.getVoices()||[]).filter(v=>/^en/i.test(v.lang))}
-if('speechSynthesis'in window){cargarVoces();speechSynthesis.onvoiceschanged=cargarVoces}
+function vocesALC(){return (window.MB1AUD?MB1AUD.vocesEN():(speechSynthesis.getVoices()||[])).filter(v=>/^en/i.test(v.lang||''))}
 function hablar(txt,fin){if(!('speechSynthesis'in window)){alert('Este navegador no tiene voz en inglés. Actívala en Ajustes › Texto a voz.');return}
- speechSynthesis.cancel();const lines=String(txt).replace(/_{2,}/g,' blank ').split('\n').filter(x=>x.trim());const vM=VOCES.find(v=>/male|david|alex|fred|daniel|guy/i.test(v.name)&&!/female/i.test(v.name))||VOCES[0],vW=VOCES.find(v=>/female|samantha|zira|victoria|jenny|aria|karen/i.test(v.name))||VOCES[1]||VOCES[0];
- lines.forEach((l,i)=>{let t=l,v=VOCES[0];const m=l.match(/^\s*([MW]):\s*(.*)$/);if(m){t=m[2];v=m[1]==='M'?vM:vW}const u=new SpeechSynthesisUtterance(t);u.lang='en-US';u.rate=+(localStorage.getItem('mb1_alc_rate')||.9);if(v)u.voice=v;if(i===lines.length-1&&fin)u.onend=fin;speechSynthesis.speak(u)})}
+ const VOCES=vocesALC(),vM=VOCES.find(v=>/male|david|alex|fred|daniel|guy/i.test(v.name)&&!/female/i.test(v.name))||VOCES[0],vW=VOCES.find(v=>/female|samantha|zira|victoria|jenny|aria|karen/i.test(v.name))||VOCES[1]||VOCES[0];
+ const lines=String(txt).replace(/_{2,}/g,' blank ').split('\n').filter(x=>x.trim()).map(l=>{let t=l,v=window.MB1AUD?MB1AUD.vozElegida():VOCES[0];const m=l.match(/^\s*([MW]):\s*(.*)$/);if(m){t=m[2];v=m[1]==='M'?vM:vW}return{t,voice:v}});
+ if(window.MB1AUD){if(AUD){try{AUD.pause()}catch(e){}}MB1AUD.speak('',{rate:MB1AUD.rateGuardada(.9),onEnd:fin,lines});return}
+ speechSynthesis.cancel();lines.forEach((ln,i)=>{const u=new SpeechSynthesisUtterance(ln.t);u.lang='en-US';u.rate=+(localStorage.getItem('mb1_rate')||localStorage.getItem('mb1_alc_rate')||.9);if(ln.voice)u.voice=ln.voice;if(i===lines.length-1&&fin)u.onend=fin;speechSynthesis.speak(u)})}
 /* ---------- inicio ---------- */
 function tablaCursos(){const E=ESQ();return `<div class="tw"><table><tr><th>Curso</th><th>Libros ALC</th>${parN()===3?'<th>P1</th><th>P2</th><th>P3</th>':'<th>Parcial 1</th><th>Parcial 2</th>'}<th>Puntaje de referencia</th></tr>${cursos().map(c=>`<tr><td>${esc(c.nombre)}${c.nota==='inferido'?' <span class="mini">(inferido)</span>':''}</td><td>${c.libros.join(', ')}</td>${Array.from({length:parN()},(_,i)=>`<td>Book ${c.libros[i]??'—'}</td>`).join('')}<td>${esc(c.ref||'—')}</td></tr>`).join('')}</table></div><p class="mini">${esc(E.fuente||'')}</p>`}
 function selEsq(){const es=BANK.esquemas||{};if(Object.keys(es).length<2)return `<p class="mini">${esc((es[esqId()]||{}).nombre||'')}</p>`;return `<label class="f">Esquema de la materia</label><select id="esq">${Object.entries(es).map(([k,e])=>`<option value="${k}" ${k===esqId()?'selected':''}>${esc(e.nombre)}</option>`).join('')}</select>`}
@@ -86,7 +87,11 @@ function vInicio(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}
  const mm=matDef(),r=RES().filter(x=>ADM()||!mm||x.m===mm).slice(-5).reverse();
  V.innerHTML=`<div class="card"><h1>Práctica ALC</h1><p class="muted">Practica o presenta un simulacro. Es práctica: no es un resultado que cuente.</p>
  <div class="row"><a class="btn big" href="#practica">Práctica</a><a class="btn big" href="#simulacro">Simulacro</a></div></div>
- <div class="card"><h2>Últimos resultados</h2>${r.length?tablaRes(r):'<p class="muted">Aún no hay resultados en este dispositivo.</p>'}</div>`}
+ <div class="card" id="audio-cfg"><h2>Audio</h2><p class="muted">Si el reactivo tiene grabación, se usa esa (la voz no se puede cambiar). Si se lee con la voz del dispositivo, elige la voz aquí. Hay una pausa breve al inicio para oír completa la pregunta. En simulacro cada audio se escucha hasta 2 veces (la pausa no cuenta como una reproducción).</p>
+ <label class="f">Voz en inglés</label><select id="vozsel">${window.MB1AUD?MB1AUD.opcionesVoz():'<option value="">Voz del dispositivo</option>'}</select>
+ <label class="f">Velocidad</label><select id="ratesel">${[[.8,'Lenta'],[.9,'Normal'],[1,'Rápida']].map(([v,l])=>`<option value="${v}" ${window.MB1AUD&&MB1AUD.rateGuardada(.9)===v?'selected':''}>${l}</option>`).join('')}</select>
+ <button class="btn ghost" type="button" id="probarvoz">Probar voz</button></div>
+ <div class="card"><h2>Últimos resultados</h2>${r.length?tablaRes(r):'<p class="muted">Aún no hay resultados en este dispositivo.</p>'}</div>`;if(window.MB1AUD)MB1AUD.bindAudioUI(V)}
 function vPractica(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}
  V.innerHTML=`<div class="card"><h1>Práctica</h1><p class="muted">Respondes y ves de inmediato si acertaste.</p>
  <div class="row"><div><label class="f">Sección</label><select id="sec"><option value="">Ambas</option><option value="L">Comprensión auditiva</option><option value="R">Lectura y estructura</option></select></div>
@@ -270,7 +275,7 @@ function calificarHoja(h){const fm=FORMAS.find(f=>f.id===h.fid);if(!fm){alert('L
 function convertir(pts,tabla){const t=BANK&&BANK.conversion&&BANK.conversion[tabla];if(!t)return null;for(const [p,c] of t.t)if(pts>=p)return c;return null}
 /* ---------- examen ---------- */
 let EX=null,PISTA=null,AUD=null;
-async function tocar(fid,n){if(AUD){AUD.pause();URL.revokeObjectURL(AUD.src)}const u=await audioURL(fid,n);if(!u){toast('No se encontró el audio');return}AUD=new Audio(u);AUD.play().catch(()=>toast('Toca de nuevo para reproducir'))}
+async function tocar(fid,n){if(AUD){try{AUD.pause();URL.revokeObjectURL(AUD.src)}catch(e){}}if(window.MB1AUD)MB1AUD.cancelar();const u=await audioURL(fid,n);if(!u){toast('No se encontró el audio');return}if(window.MB1AUD){try{AUD=await MB1AUD.playFile(u,{onFail:()=>toast('Toca de nuevo para reproducir')})}catch(e){toast('Toca de nuevo para reproducir')}return}AUD=new Audio(u);AUD.play().catch(()=>toast('Toca de nuevo para reproducir'))}
 function iniciar(fuente,f,nom){const its=armar(f);if(!its.length){alert('No hay reactivos con esos filtros.');return}
  const c=curso(f.curso);EX={fuente,c:{alcance:f.alcance,curso:f.curso,cursoNom:c.nombre,par:f.alcance==='parcial'?f.par:'',acum:f.acum,forma:f.alcance==='forma'?f.forma:'',libro:f.alcance==='libro'?f.libro:'',lec:f.lec,libros:librosEval(f)},modo:f.modo,nom,its,i:0,r:its.map(()=>null),plays:its.map(()=>0),ini:Date.now()};go('examen')}
 function evalTxt(e){return e.modo==='practica'?'Práctica':'Simulacro'}
