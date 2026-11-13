@@ -1,6 +1,6 @@
 'use strict';
 /* Misión: Obtener la Barra I — versión PWA (sin servidor). Datos solo en este dispositivo. */
-const VER = '2.8';
+const VER = '2.9';
 // Firma: en el servidor de intranet la entrega /config.js (clave aleatoria por instalación, solo en la red local).
 // En la versión pública no hay clave secreta: es una suma de verificación pública (detecta errores de copia, no falsificación).
 const SECRET = window.MB1_FIRMA || 'MB1-PUBLICO-v2.3.1';
@@ -198,6 +198,9 @@ function entrar() {
     const extra = loginPerfil === 'cadete' ? { anio: +$('#lanio').value, gp: norm($('#lgp').value), gi: norm($('#lgi').value), cia: $('#lcia').value.trim() } : { anio: 0 };
     S.perfiles[m] = Object.assign(S.perfiles[m] || nuevoPerfil({ m }), { nombre, perfil: loginPerfil }, extra);
     if (!SRV && SHEET && !S.perfiles[m].piloto) { hojaPost('login', { ts: tsLocal(), perfil: loginPerfil, nombre, m, anio: extra.anio || '', gp: extra.gp || '', gi: extra.gi || '', cia: extra.cia || '', equipo: EQUIPO }); if (loginPerfil === 'cadete') hojaPost('avance', filaAvance(payload(S.perfiles[m]))); }
+  } else if (loginPerfil === 'directora' && !SRV && SHEET) {
+    /* v2.9: el ingreso de la Directora también se registra en la hoja «ingresos» (mismas columnas; sin códigos ni claves). */
+    hojaPost('login', { ts: tsLocal(), perfil: 'directora', nombre: nombre || 'Directora', m, anio: '', gp: '', gi: '', cia: '', equipo: EQUIPO });
   }
   tab = (loginPerfil === 'admin' || loginPerfil === 'directora') ? 'avance' : 'hoy'; save(); render();
 }
