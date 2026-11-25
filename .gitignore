@@ -8,3 +8,7 @@ propuesta_apps_script.gs
 *.zip
 apps_script_actividad.gs
 Codigo_Apps_Script_Actividad.txt
+padron.js
+PRIVADO/
+*padron*.csv
+*Padron*.csv

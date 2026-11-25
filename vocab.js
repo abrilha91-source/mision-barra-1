@@ -1,4 +1,4 @@
-/* Misión: Obtener la Barra I · Vocabulario (v2.11)
+/* Misión: Obtener la Barra I · Vocabulario (v2.11 · v2.12: mazos ampliados y verbos regulares e irregulares)
    Flash cards y ejercicios de vocabulario con repetición espaciada (tipo SM-2), mazos ALCPT y ALC.
    El progreso se guarda SOLO en este dispositivo (localStorage «mb1_vocab_v1»), por matrícula.
    No modifica el estado principal de la app (mb1_estado_v2), salvo el contador de herramientas usadas. */
@@ -11,7 +11,8 @@
   const REPASOS = [10];           // minutos (reaprendizaje tras olvidar)
   const ANIOS = { 1: [4, 5], 2: [6, 9], 3: [10, 13], 4: [14, 17] };
   const NOMG = { 1: 'Otra vez', 2: 'Difícil', 3: 'Bien', 4: 'Fácil' };
-  const NOMEJ = { mc: 'Opción múltiple', escribe: 'Escribe la palabra', huecos: 'Completa la oración', empareja: 'Empareja' };
+  const NOMEJ = { mc: 'Opción múltiple', escribe: 'Escribe la palabra', huecos: 'Completa la oración', empareja: 'Empareja', formas: 'Pasado y participio' };
+  const ICOEJ = { mc: '◉', escribe: '✎', huecos: '▭', empareja: '⇄', formas: '⟳' };
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const pad = n => String(n).padStart(2, '0');
   const dia = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -23,7 +24,11 @@
 
   /* ---------- catálogo ---------- */
   const CARDS = {}, DECKS = {};
-  DATA.decks.forEach(d => { DECKS[d.id] = d; d.cards.forEach((c, i) => { CARDS[c[0]] = { id: c[0], en: c[1], es: c[2], ex: c[3], ipa: c[4], d, ord: i }; }); });
+  DATA.decks.forEach(d => { DECKS[d.id] = d; d.cards.forEach((c, i) => { CARDS[c[0]] = { id: c[0], en: c[1], es: c[2], ex: c[3], ipa: c[4], p: c[5] || '', pp: c[6] || '', ipaP: c[7] || '', ipaPP: c[8] || '', d, ord: i }; }); });
+  const alts = v => String(v || '').split(' / ').map(x => x.trim()).filter(Boolean);
+  function enEj(ex, t) { const e = ex.toLowerCase(), w = t.toLowerCase(); let i = e.indexOf(w); while (i >= 0) { const a = e[i - 1] || ' ', b = e[i + w.length] || ' '; if (!/[a-z]/.test(a) && !/[a-z]/.test(b)) return i; i = e.indexOf(w, i + 1); } return -1; }
+  function termEj(c) { if (!c.p) return c.en; for (const t of [...alts(c.pp), ...alts(c.p), c.en].sort((a, b) => b.length - a.length)) if (enEj(c.ex, t) >= 0) return t; return c.en; }
+  const formasTxt = c => c.p ? `${c.en} · ${c.p} · ${c.pp}` : c.en;
   const total = m => DATA.decks.filter(d => !m || d.mazo === m).reduce((s, d) => s + d.cards.length, 0);
 
   /* ---------- integración con la app (solo lectura de la sesión) ---------- */
@@ -76,11 +81,11 @@
   let UI = { mazo: 'alcpt', k: 'todos', anio: '', vista: 'inicio' };
   function initAlcance() { const p = PERF(); if (UI._init === mat()) return; UI._init = mat(); UI.mazo = 'alcpt'; UI.k = 'todos'; UI.anio = p && ANIOS[p.anio] ? String(p.anio) : ''; }
   function decksAlcance() {
-    if (UI.mazo === 'alcpt') return DATA.decks.filter(d => d.mazo === 'alcpt' && (UI.k === 'todos' || d.k === UI.k));
+    if (UI.mazo === 'alcpt' || UI.mazo === 'verbos') return DATA.decks.filter(d => d.mazo === UI.mazo && (UI.k === 'todos' || d.k === UI.k));
     return DATA.decks.filter(d => { if (d.mazo !== 'alc') return false; const b = +d.k; if (UI.k !== 'todos') return d.k === UI.k; if (UI.anio) { const [a, z] = ANIOS[UI.anio]; return b >= a && b <= z; } return true; });
   }
   const idsAlcance = () => decksAlcance().flatMap(d => d.cards.map(c => c[0]));
-  function nombreAlcance() { if (UI.k !== 'todos') { const d = DECKS[UI.mazo + '-' + UI.k]; return d ? `${UI.mazo === 'alc' ? 'ALC' : 'ALCPT'} · ${d.t}${UI.mazo === 'alc' ? ' · ' + d.s : ''}` : ''; } if (UI.mazo === 'alc') return UI.anio ? `ALC · ${UI.anio}.º año (libros ${ANIOS[UI.anio][0]}–${ANIOS[UI.anio][1]})` : 'ALC · libros 4 a 17'; return 'ALCPT · todos los temas'; }
+  function nombreAlcance() { if (UI.k !== 'todos') { const d = DECKS[UI.mazo + '-' + UI.k]; return d ? `${UI.mazo === 'alc' ? 'ALC' : UI.mazo === 'verbos' ? 'Verbos' : 'ALCPT'} · ${d.t}${UI.mazo === 'alc' ? ' · ' + d.s : ''}` : ''; } if (UI.mazo === 'verbos') return 'Verbos regulares e irregulares'; if (UI.mazo === 'alc') return UI.anio ? `ALC · ${UI.anio}.º año (libros ${ANIOS[UI.anio][0]}–${ANIOS[UI.anio][1]})` : 'ALC · libros 4 a 17'; return 'ALCPT · todos los temas'; }
   function conteos(x, ids) {
     const fin = inicioDia(1), now = Date.now(); let pend = 0, nuevas = 0, apr = 0, dom = 0;
     ids.forEach(id => { const c = x.c[id]; if (!c || !c.s) { nuevas++; return; } if (c.due < fin) pend++; if (c.s === 2) { apr++; if (c.i >= 21) dom++; } });
@@ -151,29 +156,29 @@
   function vInicio() {
     const x = perfil(), ids = idsAlcance(), k = conteos(x, ids), todos = conteos(x, Object.keys(CARDS));
     const aviso = consulta() ? `<div class="vaviso">Vista de consulta: puedes ver y practicar las tarjetas, pero aquí no se guarda avance.</div>` : pil() ? `<div class="vaviso">Usuario piloto: la práctica de vocabulario no se guarda.</div>` : '';
-    const tiles = (UI.mazo === 'alcpt' ? DATA.decks.filter(d => d.mazo === 'alcpt') : decksAlcanceAnio()).map(d => {
+    const tiles = (UI.mazo === 'alc' ? decksAlcanceAnio() : DATA.decks.filter(d => d.mazo === UI.mazo)).map(d => {
       const ii = d.cards.map(c => c[0]), q = conteos(x, ii), pct = Math.round(100 * q.apr / q.total), on = UI.k === d.k;
       return `<button class="vtile${on ? ' on' : ''}" data-act="k" data-k="${esc(d.k)}" style="--c:${esc(d.c)}"><b>${esc(UI.mazo === 'alc' ? d.t : d.t)}</b><small>${esc(d.s)}</small><span class="vbar"><i style="width:${pct}%"></i></span><em>${q.apr}/${q.total}${q.pend ? ` · <u>${q.pend} hoy</u>` : ''}</em></button>`;
     }).join('');
     const anios = UI.mazo === 'alc' ? `<div class="vchips">${chip(!UI.anio, 'Todos (4–17)', 'anio', 'data-a=""')}${Object.entries(ANIOS).map(([a, [i, z]]) => chip(UI.anio === a, `${a}.º año · ${i}–${z}`, 'anio', `data-a="${a}"`)).join('')}</div>` : '';
     return `<section class="vhero"><div class="vh1"><div><h2>Vocabulario</h2><p>Flash cards con repetición espaciada: lo que dominas regresa en días; lo que fallas, hoy mismo.</p></div><div class="vring" style="--p:${Math.round(100 * todos.apr / Math.max(1, todos.total))}"><span>${todos.apr}<small>de ${todos.total}</small></span></div></div>
       <div class="vkpis"><div><b>${todos.pend}</b><span>para repasar hoy</span></div><div><b>${todos.cupo}</b><span>nuevas disponibles hoy</span></div><div><b>${todos.dom}</b><span>dominadas (21+ días)</span></div></div></section>${aviso}
-      <div class="vseg">${chip(UI.mazo === 'alcpt', 'ALCPT', 'mazo', 'data-m="alcpt"')}${chip(UI.mazo === 'alc', 'ALC · por libro', 'mazo', 'data-m="alc"')}</div>${anios}
-      <div class="vchips">${chip(UI.k === 'todos', UI.mazo === 'alc' ? 'Todos los libros del filtro' : 'Todos los temas', 'k', 'data-k="todos"')}</div>
+      <div class="vseg">${chip(UI.mazo === 'alcpt', 'ALCPT · temas', 'mazo', 'data-m="alcpt"')}${chip(UI.mazo === 'alc', 'ALC · por libro', 'mazo', 'data-m="alc"')}${chip(UI.mazo === 'verbos', 'Verbos', 'mazo', 'data-m="verbos"')}</div>${anios}${UI.mazo === 'verbos' ? '<p class="mini">Base · pasado · participio, con significado, ejemplo y audio. Regulares agrupados por regla de escritura; irregulares por patrón.</p>' : ''}
+      <div class="vchips">${chip(UI.k === 'todos', UI.mazo === 'alc' ? 'Todos los libros del filtro' : UI.mazo === 'verbos' ? 'Todos los verbos' : 'Todos los temas', 'k', 'data-k="todos"')}</div>
       <div class="vtiles">${tiles}</div>
       <section class="card vgo"><p class="mini">Practicas: <b>${esc(nombreAlcance())}</b> · ${k.total} tarjetas</p>
         <button class="btn vbig" data-act="fc" ${k.pend + k.nuevasHoy ? '' : 'disabled'}>🃏 Repasar flash cards <span class="vpill">${k.pend} pendientes · ${k.nuevasHoy} nuevas</span></button>
         ${k.pend + k.nuevasHoy ? '' : '<p class="mini vcenter">¡Al día en este mazo! Haz ejercicios o elige otro tema.</p>'}
-        <h3>Ejercicios de vocabulario</h3><div class="vej">${Object.entries(NOMEJ).map(([m, t]) => `<button class="vejb" data-act="ej" data-m="${m}"><i>${{ mc: '◉', escribe: '✎', huecos: '▭', empareja: '⇄' }[m]}</i>${t}</button>`).join('')}</div>
+        <h3>Ejercicios de vocabulario</h3><div class="vej">${Object.entries(NOMEJ).filter(([m]) => m !== 'formas' || UI.mazo === 'verbos').map(([m, t]) => `<button class="vejb${m === 'formas' ? ' vejv' : ''}" data-act="ej" data-m="${m}"><i>${ICOEJ[m]}</i>${t}</button>`).join('')}</div>
         <p class="mini">Todos los ejercicios alimentan el mismo calendario de repasos.</p>
         <div class="row sp"><button class="btn sm ghost" data-act="lista">Ver lista y escuchar</button><label class="mini">Nuevas por día <select id="vnuevas" ${sinGuardar() ? 'disabled' : ''}>${NUEVAS_OPC.map(n => `<option ${n === (x.cfg.nuevas || 10) ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div></section>`;
   }
   function decksAlcanceAnio() { return DATA.decks.filter(d => { if (d.mazo !== 'alc') return false; if (!UI.anio) return true; const [a, z] = ANIOS[UI.anio], b = +d.k; return b >= a && b <= z; }); }
   function vLista() {
     const x = perfil(), ids = idsAlcance();
-    return `<div class="vtop"><button class="ico" data-act="inicio">←</button><b>${esc(nombreAlcance())}</b></div><section class="card"><ul class="vlist">${ids.map(id => { const c = CARDS[id], st = x.c[id]; const est = !st || !st.s ? '<em class="n">nueva</em>' : st.s === 2 ? `<em class="a">${st.i} d</em>` : '<em class="l">aprendiendo</em>'; return `<li><button class="vsnd" data-act="say" data-t="${esc(c.en)}">🔊</button><div><b>${esc(c.en)}</b> <small>${esc(c.ipa)}</small><span>${esc(c.es)}</span></div>${est}</li>`; }).join('')}</ul></section>`;
+    return `<div class="vtop"><button class="ico" data-act="inicio">←</button><b>${esc(nombreAlcance())}</b></div><section class="card"><ul class="vlist">${ids.map(id => { const c = CARDS[id], st = x.c[id]; const est = !st || !st.s ? '<em class="n">nueva</em>' : st.s === 2 ? `<em class="a">${st.i} d</em>` : '<em class="l">aprendiendo</em>'; return `<li><button class="vsnd" data-act="say" data-t="${esc(c.p ? formasTxt(c).replace(/ · /g, ', ').replace(/ \/ /g, ' or ') : c.en)}">🔊</button><div><b>${esc(formasTxt(c))}</b> <small>${esc(c.ipa)}</small><span>${esc(c.es)}</span></div>${est}</li>`; }).join('')}</ul></section>`;
   }
-  function resaltar(ex, en) { const i = ex.toLowerCase().indexOf(en.toLowerCase()); return i < 0 ? esc(ex) : esc(ex.slice(0, i)) + '<mark>' + esc(ex.slice(i, i + en.length)) + '</mark>' + esc(ex.slice(i + en.length)); }
+  function resaltar(ex, en) { const i = enEj(ex, en) >= 0 ? enEj(ex, en) : ex.toLowerCase().indexOf(en.toLowerCase()); return i < 0 ? esc(ex) : esc(ex.slice(0, i)) + '<mark>' + esc(ex.slice(i, i + en.length)) + '</mark>' + esc(ex.slice(i + en.length)); }
 
   /* flash cards */
   function iniciarFC() { const x = perfil(), q = cola(x, idsAlcance()); if (!q.length) return toast('No hay tarjetas pendientes en este mazo.'); FC = { q, cur: null, ver: false, n: 0, ok: 0, re: [] }; iniciarRegistro('Flash cards'); sigFC(); UI.vista = 'fc'; pintar(); }
@@ -190,13 +195,13 @@
     const c = CARDS[FC.cur], x = perfil(), st = x.c[c.id], tot = FC.n + FC.q.length + FC.re.length + 1;
     return `<div class="vtop"><button class="ico" data-act="salirfc" title="Terminar">✕</button><div class="vprog"><i style="width:${Math.round(100 * FC.n / tot)}%"></i></div><span class="mini">${FC.q.length + FC.re.length + 1} por ver</span></div>
     <div class="vscene"><div class="vcard${FC.ver ? ' flip' : ''}" data-act="flip" style="--c:${esc(c.d.c)}">
-      <div class="vface vfront"><span class="vtag">${c.d.mazo === 'alc' ? 'ALC · ' + esc(c.d.t) : 'ALCPT · ' + esc(c.d.t)}${!st || !st.s ? ' · nueva' : ''}</span><h2>${esc(c.en)}</h2><p class="vipa">${esc(c.ipa)}</p><p class="mini">Toca la tarjeta para ver el significado</p></div>
-      <div class="vface vback"><span class="vtag">${esc(c.en)} ${esc(c.ipa)}</span><h2 class="es">${esc(c.es)}</h2><p class="vex">${resaltar(c.ex, c.en)}</p></div></div></div>
+      <div class="vface vfront"><span class="vtag">${c.d.mazo === 'alc' ? 'ALC · ' + esc(c.d.t) : c.d.mazo === 'verbos' ? esc(c.d.t) : 'ALCPT · ' + esc(c.d.t)}${!st || !st.s ? ' · nueva' : ''}</span><h2>${esc(c.en)}</h2><p class="vipa">${esc(c.ipa)}</p><p class="mini">${c.p ? 'Di en voz alta el pasado y el participio; luego toca la tarjeta' : 'Toca la tarjeta para ver el significado'}</p></div>
+      <div class="vface vback"><span class="vtag">${esc(c.en)} ${esc(c.ipa)}</span><h2 class="es">${esc(c.es)}</h2>${c.p ? `<div class="vforms"><div><small>base</small><b>${esc(c.en)}</b></div><div><small>pasado</small><b>${esc(c.p)}</b><em>${esc(c.ipaP)}</em></div><div><small>participio</small><b>${esc(c.pp)}</b><em>${esc(c.ipaPP)}</em></div></div>` : ''}<p class="vex">${resaltar(c.ex, termEj(c))}</p></div></div></div>
     <div id="vfcctl">${ctlFC()}</div>`;
   }
   function ctlFC() {
     const c = CARDS[FC.cur], st = perfil().c[c.id], prev = [1, 2, 3, 4].map(q => etiqueta(programar(st, q)));
-    return `<div class="vaudio"><button class="btn sm ghost" data-act="say" data-t="${esc(c.en)}">🔊 Escuchar</button><button class="btn sm ghost" data-act="slow" data-t="${esc(c.en)}">🐢 Lento</button>${FC.ver ? `<button class="btn sm ghost" data-act="say" data-t="${esc(c.ex)}">🔊 Ejemplo</button>` : ''}${REC ? `<button class="btn sm ghost" data-act="pron" data-id="${esc(c.id)}">🎙 Pronuncia</button>` : ''}</div><p id="vpron" class="mini vcenter"></p>
+    return `<div class="vaudio"><button class="btn sm ghost" data-act="say" data-t="${esc(c.en)}">🔊 Escuchar</button><button class="btn sm ghost" data-act="slow" data-t="${esc(c.en)}">🐢 Lento</button>${FC.ver && c.p ? `<button class="btn sm ghost" data-act="say" data-t="${esc(formasTxt(c).replace(/ · /g, '. ').replace(/ \/ /g, ' or '))}">🔊 Formas</button>` : ''}${FC.ver ? `<button class="btn sm ghost" data-act="say" data-t="${esc(c.ex)}">🔊 Ejemplo</button>` : ''}${REC ? `<button class="btn sm ghost" data-act="pron" data-id="${esc(c.id)}">🎙 Pronuncia</button>` : ''}</div><p id="vpron" class="mini vcenter"></p>
     ${FC.ver ? `<div class="vgrades">${[1, 2, 3, 4].map(q => `<button class="vg g${q}" data-act="grade" data-q="${q}"><b>${NOMG[q]}</b><small>${prev[q - 1]}</small></button>`).join('')}</div>` : `<button class="btn vbig" data-act="flip">Mostrar respuesta</button>`}`;
   }
   function voltear() { if (!FC || FC.ver) return; FC.ver = true; const k = $('.vcard'), ct = $('#vfcctl'); if (k && ct) { k.classList.add('flip'); ct.innerHTML = ctlFC(); } else pintar(); }
@@ -218,7 +223,7 @@
     const n = modo === 'empareja' ? 10 : 10, sel = elegir(x, ids, n);
     EJ = { modo, items: sel, i: 0, res: null, pista: false, pool: ids, ok: 0 };
     if (modo === 'empareja') EJ.rondas = [sel.slice(0, 5), sel.slice(5, 10)].filter(r => r.length >= 3);
-    iniciarRegistro('Vocabulario: ' + NOMEJ[modo]); prepEj(); UI.vista = 'ej'; pintar();
+    iniciarRegistro((UI.mazo === 'verbos' ? 'Verbos: ' : 'Vocabulario: ') + NOMEJ[modo]); prepEj(); UI.vista = 'ej'; pintar();
   }
   function distractores(id, campo, n = 3) { const c = CARDS[id]; const mismo = c.d.cards.map(z => z[0]).filter(z => z !== id); let pool = mezcla(mismo); if (pool.length < n) pool = pool.concat(mezcla(EJ.pool.filter(z => z !== id && !mismo.includes(z)))); const out = [], vis = new Set([normal(c[campo])]); for (const z of pool) { const v = CARDS[z][campo]; if (!vis.has(normal(v))) { vis.add(normal(v)); out.push(z); } if (out.length >= n) break; } return out; }
   function prepEj() {
@@ -227,7 +232,7 @@
     if (EJ.modo === 'empareja') { const r = EJ.rondas[EJ.i]; EJ.izq = mezcla(r); EJ.der = mezcla(r); EJ.hechos = []; EJ.err = {}; EJ.selI = null; EJ.selD = null; }
   }
   const nEj = () => EJ.modo === 'empareja' ? EJ.rondas.length : EJ.items.length;
-  function hueco(c) { const i = c.ex.toLowerCase().indexOf(c.en.toLowerCase()); const b = c.en.split(/(\s+)/).map(w => /\s/.test(w) ? ' ' : w.replace(/[A-Za-z]/g, '_')).join(''); return esc(c.ex.slice(0, i)) + `<span class="vblank">${EJ.pista ? esc(c.en[0]) + b.slice(1) : b}</span>` + esc(c.ex.slice(i + c.en.length)); }
+  function hueco(c) { const t = termEj(c), i = enEj(c.ex, t); const b = t.split(/(\s+)/).map(w => /\s/.test(w) ? ' ' : w.replace(/[A-Za-z]/g, '_')).join(''); return esc(c.ex.slice(0, i)) + `<span class="vblank">${EJ.pista ? esc(t[0]) + b.slice(1) : b}</span>` + esc(c.ex.slice(i + t.length)); }
   function vEj() {
     const tot = nEj(), head = `<div class="vtop"><button class="ico" data-act="salirej" title="Terminar">✕</button><div class="vprog"><i style="width:${Math.round(100 * EJ.i / tot)}%"></i></div><span class="mini">${EJ.i + 1}/${tot}</span></div><p class="vtit">${esc(NOMEJ[EJ.modo])}</p>`;
     if (EJ.modo === 'empareja') {
@@ -235,23 +240,30 @@
       return head + `<p class="mini vcenter">Toca una palabra en inglés y su significado.</p><div class="vpairs"><div>${lado(EJ.izq, 'i', 'en')}</div><div>${lado(EJ.der, 'd', 'es')}</div></div>${EJ.hechos.length === EJ.izq.length ? `<button class="btn vbig" data-act="sigej">${EJ.i + 1 < tot ? 'Siguiente' : 'Terminar'}</button>` : ''}`;
     }
     const c = CARDS[EJ.items[EJ.i]], r = EJ.res;
-    const fb = r ? `<div class="vfb ${r.q >= 3 ? 'ok' : r.q === 2 ? 'casi' : 'bad'}"><b>${r.q >= 3 ? '✓ ¡Correcto!' : r.q === 2 ? '≈ Casi' : '✗ La respuesta es:'}</b> ${esc(c.en)} <small>${esc(c.ipa)}</small> = ${esc(c.es)}<p>${resaltar(c.ex, c.en)}</p><span class="mini">Próximo repaso: ${esc(etiqueta(r.c))}</span></div><button class="btn vbig" data-act="sigej">${EJ.i + 1 < tot ? 'Siguiente' : 'Terminar'}</button>` : '';
+    const fb = r ? `<div class="vfb ${r.q >= 3 ? 'ok' : r.q === 2 ? 'casi' : 'bad'}"><b>${r.q >= 3 ? '✓ ¡Correcto!' : r.q === 2 ? '≈ Casi' : '✗ La respuesta es:'}</b> ${esc(EJ.modo === 'huecos' ? termEj(c) : formasTxt(c))} <small>${esc(c.ipa)}</small> = ${esc(c.es)}${EJ.modo === 'formas' && r.q < 3 ? `<p class="mini">Escribiste: ${esc(r.val)}${r.okA ? ' · pasado ✓' : ' · pasado ✗'}${r.okB ? ' · participio ✓' : ' · participio ✗'}</p>` : ''}<p>${resaltar(c.ex, termEj(c))}</p><span class="mini">Próximo repaso: ${esc(etiqueta(r.c))}</span></div><button class="btn vbig" data-act="sigej">${EJ.i + 1 < tot ? 'Siguiente' : 'Terminar'}</button>` : '';
     if (EJ.modo === 'mc') {
       const preg = EJ.dir === 'en' ? `<h2>${esc(c.en)}</h2><p class="vipa">${esc(c.ipa)}</p><p class="mini">¿Qué significa?</p>` : `<h2 class="es">${esc(c.es)}</h2><p class="mini">¿Cómo se dice en inglés?</p>`;
       const campo = EJ.dir === 'en' ? 'es' : 'en';
       return head + `<section class="vq" style="--c:${esc(c.d.c)}">${preg}<button class="btn sm ghost" data-act="say" data-t="${esc(c.en)}">🔊</button></section><div class="vops">${EJ.ops.map((id, j) => { let cl = ''; if (r) { if (id === c.id) cl = ' ok'; else if (r.pick === id) cl = ' bad'; } return `<button class="vop${cl}" data-act="op" data-id="${esc(id)}" ${r ? 'disabled' : ''}><i>${'ABCD'[j]}</i>${esc(CARDS[id][campo])}</button>`; }).join('')}</div>${fb}`;
     }
+    if (EJ.modo === 'formas') return head + `<section class="vq" style="--c:${esc(c.d.c)}"><h2>${esc(c.en)}</h2><p class="vipa">${esc(c.ipa)}</p><p class="mini">${esc(c.es)} · Escribe el pasado y el participio.${EJ.pista ? ` Pista: ${c.d.k[0] === 'r' ? 'es regular (termina en -ed / -d / -ied)' : 'es irregular · pasado empieza con «' + esc(c.p[0]) + '»'}` : ''}</p><button class="btn sm ghost" data-act="say" data-t="${esc(c.en)}">🔊</button></section>${r ? '' : `<div class="g2 vforms-in"><label class="mini">Pasado<input id="vinp" class="vin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="pasado"></label><label class="mini">Participio<input id="vinpp" class="vin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="participio"></label></div><div class="row"><button class="btn sm ghost" data-act="pista" ${EJ.pista ? 'disabled' : ''}>Pista</button><button class="btn" data-act="check">Revisar</button></div>`}${fb}`;
     const prompt = EJ.modo === 'escribe' ? `<h2 class="es">${esc(c.es)}</h2><p class="mini">Escribe la palabra o frase en inglés (${c.en.replace(/[^A-Za-z]/g, '').length} letras${/\s/.test(c.en) ? ', ' + c.en.split(/\s+/).length + ' palabras' : ''}).${EJ.pista ? ` Empieza con «${esc(c.en[0])}».` : ''}</p>` : `<p class="vsent">${hueco(c)}</p><p class="mini">Pista: ${esc(c.es)}</p>`;
     return head + `<section class="vq" style="--c:${esc(c.d.c)}">${prompt}</section>${r ? '' : `<input id="vin" class="vin" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Escribe en inglés"><div class="row"><button class="btn sm ghost" data-act="pista" ${EJ.pista ? 'disabled' : ''}>Pista</button><button class="btn" data-act="check">Revisar</button></div>`}${fb}`;
   }
   function responderEj(q, extra) { const id = EJ.items[EJ.i]; const c = calificar(id, q); EJ.res = Object.assign({ q, c }, extra || {}); cuenta(q >= 3); if (q >= 3 && window.FX) setTimeout(() => FX.ok($('.vfb')), 30); else if (q === 1 && window.FX) FX.no(); decir(CARDS[id].en); pintar(); }
   function revisar() {
+    const c = CARDS[EJ.items[EJ.i]];
+    if (EJ.modo === 'formas') {
+      const a = normal(($('#vinp') || {}).value || ''), b = normal(($('#vinpp') || {}).value || ''); if (!a || !b) return toast('Escribe el pasado y el participio.');
+      const okA = alts(c.p).map(normal).includes(a), okB = alts(c.pp).map(normal).includes(b); let q = okA && okB ? 3 : (okA || okB) ? 2 : 1; if (EJ.pista && q === 3) q = 2;
+      return responderEj(q, { val: a + ' · ' + b, okA, okB });
+    }
     const v = normal(($('#vin') || {}).value || ''); if (!v) return toast('Escribe tu respuesta.');
-    const c = CARDS[EJ.items[EJ.i]], ok = normal(c.en);
+    const ok = normal(EJ.modo === 'huecos' ? termEj(c) : c.en);
     let q = v === ok ? 3 : (ok.length >= 5 && lev(v, ok) <= 1) ? 2 : 1; if (EJ.pista && q === 3) q = 2;
     responderEj(q, { val: v });
   }
-  function sigEj() { EJ.i++; if (EJ.i >= nEj()) return terminar(SES0 ? SES0.tipo : 'Vocabulario'); prepEj(); pintar(); const i = $('#vin'); if (i) i.focus(); }
+  function sigEj() { EJ.i++; if (EJ.i >= nEj()) return terminar(SES0 ? SES0.tipo : 'Vocabulario'); prepEj(); pintar(); const i = $('#vin') || $('#vinp'); if (i) i.focus(); }
   function par(l, id) {
     if (l === 'i') EJ.selI = id; else EJ.selD = id;
     if (EJ.selI && EJ.selD) {
@@ -266,6 +278,7 @@
   function enlazar() {
     const sel = $('#vnuevas'); if (sel) sel.onchange = () => { const x = perfil(); x.cfg.nuevas = +sel.value; guardar(x); pintar(); };
     const inp = $('#vin'); if (inp) { inp.onkeydown = e => { if (e.key === 'Enter') revisar(); }; setTimeout(() => inp.focus(), 50); }
+    const ip = $('#vinp'), ipp = $('#vinpp'); if (ip && ipp) { ip.onkeydown = e => { if (e.key === 'Enter') ipp.focus(); }; ipp.onkeydown = e => { if (e.key === 'Enter') revisar(); }; setTimeout(() => ip.focus(), 50); }
     ROOT.onclick = e => {
       const b = e.target.closest('[data-act]'); if (!b || !ROOT.contains(b) || b.disabled) return; const a = b.dataset.act;
       if (a === 'mazo') { UI.mazo = b.dataset.m; UI.k = 'todos'; pintar(); }
@@ -283,7 +296,7 @@
       else if (a === 'salirfc' || a === 'salirej') { if (SES0 && SES0.n) terminar(SES0.tipo); else { SES0 = null; FC = null; EJ = null; UI.vista = 'inicio'; pintar(); } }
       else if (a === 'op') { const c = EJ.items[EJ.i]; responderEj(b.dataset.id === c ? 3 : 1, { pick: b.dataset.id }); }
       else if (a === 'check') revisar();
-      else if (a === 'pista') { EJ.pista = true; const v = ($('#vin') || {}).value; pintar(); if ($('#vin')) $('#vin').value = v || ''; }
+      else if (a === 'pista') { EJ.pista = true; const keep = ['#vin', '#vinp', '#vinpp'].map(k => [k, ($(k) || {}).value]); pintar(); keep.forEach(([k, v]) => { if ($(k)) $(k).value = v || ''; }); }
       else if (a === 'sigej') sigEj();
       else if (a === 'par') par(b.dataset.l, b.dataset.id);
     };
@@ -296,5 +309,5 @@
 
   /* resumen para la pestaña Hoy */
   function resumen() { const x = perfil(), k = conteos(x, Object.keys(CARDS)); return { pend: k.pend, nuevas: k.cupo, aprendidas: k.apr, total: k.total }; }
-  window.VOCAB = { mount, resumen, VER: '1.0', total, _programar: programar, _estado: () => ({ vista: UI.vista, ui: Object.assign({}, UI), fc: FC && { cur: FC.cur, q: FC.q.length, re: FC.re.length }, ej: EJ && { modo: EJ.modo, i: EJ.i, id: EJ.items[EJ.i], en: EJ.items[EJ.i] && CARDS[EJ.items[EJ.i]].en, ops: EJ.ops, dir: EJ.dir, ronda: EJ.izq } }) };
+  window.VOCAB = { mount, resumen, VER: '1.1', CARDS, termEj, decir, total, _programar: programar, _estado: () => ({ vista: UI.vista, ui: Object.assign({}, UI), fc: FC && { cur: FC.cur, q: FC.q.length, re: FC.re.length }, ej: EJ && { modo: EJ.modo, i: EJ.i, id: EJ.items[EJ.i], en: EJ.items[EJ.i] && CARDS[EJ.items[EJ.i]].en, ops: EJ.ops, dir: EJ.dir, ronda: EJ.izq } }) };
 })();

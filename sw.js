@@ -1,4 +1,4 @@
-const C='mb1-v2.11';const F=['./','index.html','styles.css','app.js','bank.js','bank2.js','bank3.js','config.js','audios.js','xlsx.bundle.js','NotoSans-latin.woff2','icon.svg','icon-192.png','icon-512.png','manifest.webmanifest','fx.js','alc.js','alc.css','vocab.js','vocab.css','vocab_data.js','pdfjs/pdf.min.mjs','pdfjs/pdf.worker.min.mjs'];
+const C='mb1-v2.12';const F=['./','index.html','styles.css','app.js','bank.js','bank2.js','bank3.js','config.js','audios.js','xlsx.bundle.js','NotoSans-latin.woff2','icon.svg','icon-192.png','icon-512.png','manifest.webmanifest','fx.js','alc.js','alc.css','vocab.js','vocab.css','vocab_data.js','practica.js','practica_data.js','practica.css','perfil.js','pdfjs/pdf.min.mjs','pdfjs/pdf.worker.min.mjs'];
 self.window=self;try{importScripts('audios.js')}catch(e){}
 const AU=Object.keys(self.AUDIOS||{}).map(k=>'audio/'+k+'.mp3');
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(async c=>{await c.addAll(F);for(let i=0;i<AU.length;i+=40)await Promise.all(AU.slice(i,i+40).map(u=>c.add(u).catch(()=>{})))}));self.skipWaiting()});
@@ -32,7 +32,8 @@ async function fullAudio(url){
 }
 self.addEventListener('fetch',e=>{
   const req=e.request;if(req.method!=='GET'||req.url.includes('/api/'))return;
-  const u=new URL(req.url),isAud=/\.(mp3|m4a|ogg|wav)(\?|$)/i.test(u.pathname);
+  const u=new URL(req.url);if(u.origin!==location.origin)return; // v2.12: la Hoja (Apps Script) y otros dominios van directo a la red
+  const isAud=/\.(mp3|m4a|ogg|wav)(\?|$)/i.test(u.pathname);
   e.respondWith((async()=>{
     try{
       if(isAud){
