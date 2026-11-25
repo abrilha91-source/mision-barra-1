@@ -1,6 +1,6 @@
 'use strict';
 /* Misión: Obtener la Barra I — versión PWA (sin servidor). Datos solo en este dispositivo. */
-const VER = '2.12';
+const VER = '2.13';
 // Firma: en el servidor de intranet la entrega /config.js (clave aleatoria por instalación, solo en la red local).
 // En la versión pública no hay clave secreta: es una suma de verificación pública (detecta errores de copia, no falsificación).
 const SECRET = window.MB1_FIRMA || 'MB1-PUBLICO-v2.3.1';
@@ -99,7 +99,7 @@ function payload(p) {
   const s0 = lunes(), sp = new Date(s0 + 'T12:00'); sp.setDate(sp.getDate() - 7);
   const dias = {}; Object.keys(p.dias).sort().slice(-21).forEach(d => dias[d] = [p.dias[d].q, Math.round(p.dias[d].min)]);
   const ex = S.resultados.filter(r => r.m === p.m).slice(-6).map(r => [r.code, r.pts, r.sal, r.folio, r.fecha]);
-  return { v: 2, n: p.nombre, m: p.m, pf: p.perfil, a: p.anio, gp: p.gp, gi: p.gi, cia: p.cia, ts: Date.now(), q: Object.values(p.tema).reduce((s, x) => s + x[0], 0), est: estimado(p), ini: p.ini, tema: p.tema, dias, tools: p.tools, w: semana(p, s0), pw: semana(p, hoy(sp)), ex, sm: p.sombra ? p.sombra.m : '', ins: Object.keys(p.ins).length, pr: (() => { try { return window.MB1PRACT ? MB1PRACT.resumenAvance() : undefined; } catch (e) { return undefined; } })(), yo: p.yo ? { g: (p.yo.gustos || []).slice(0, 6), c: (p.yo.cuesta || []).slice(0, 4), t: String(p.yo.texto || '').slice(0, 200) } : undefined };
+  return { v: 2, n: p.nombre, m: p.m, pf: p.perfil, a: p.anio, gp: p.gp, gi: p.gi, cia: p.cia, ts: Date.now(), q: Object.values(p.tema).reduce((s, x) => s + x[0], 0), est: estimado(p), ini: p.ini, tema: p.tema, dias, tools: p.tools, w: semana(p, s0), pw: semana(p, hoy(sp)), ex, sm: p.sombra ? p.sombra.m : '', ins: Object.keys(p.ins).length, pr: (() => { try { const r = window.MB1PRACT ? Object.assign({}, MB1PRACT.resumenAvance()) : {}; try { const v = VOCAB.resumen(); r.va = v.aprendidas; r.vt = v.total; r.vp = v.pend; } catch (e) { } return Object.keys(r).length ? r : undefined; } catch (e) { return undefined; } })(), yo: p.yo ? { g: (p.yo.gustos || []).slice(0, 6), c: (p.yo.cuesta || []).slice(0, 4), t: String(p.yo.texto || '').slice(0, 200), f: p.yo.foto ? 1 : 0, e: p.yo.emoji || '', co: p.yo.color || '', fr: String(p.yo.frase || '').slice(0, 60) } : undefined };
 }
 function firmar(o) { const j = b64e(JSON.stringify(o)); return `MB1.${j}.${b32(hash(SECRET + '|AV|' + j), 6)}`; }
 function codigoAvance(p) { return firmar(payload(p)); }
@@ -113,15 +113,15 @@ async function api(path, data, method) { const ctl = new AbortController(), t = 
   try { const r = await fetch(path, { method: method || (data ? 'POST' : 'GET'), headers: { 'Content-Type': 'application/json', 'X-Clave': CLAVE }, body: data ? JSON.stringify(data) : undefined, signal: ctl.signal, cache: 'no-store' }); const j = await r.json().catch(() => ({})); if (!r.ok && r.status !== 403) throw new Error(j.error || r.status); return j; } finally { clearTimeout(t); } }
 const SHEET = (window.SHEET_URL || '').trim();
 /* v2.6 · registro automático en la Hoja: avance y actividad (script v2); con el script anterior se guardan en cola */
-const NUEVOS_H = ['resultados', 'avance', 'alc'];
+const NUEVOS_H = ['resultados', 'avance', 'alc', 'foto'];
 let HV = (() => { try { return JSON.parse(localStorage.getItem('mb1_hv') || '{}') || {}; } catch (e) { return {}; } })();
 async function verHoja(forzar) { if (!SHEET || SRV) return 1; if (!navigator.onLine) return HV.v || 1; if (!forzar && HV.t && Date.now() - HV.t < (HV.v >= 2 ? 864e5 : 18e5)) return HV.v || 1;
   try { const ctl = new AbortController(), tt = setTimeout(() => ctl.abort(), 8000); const r = await fetch(SHEET + '?hoja=version', { cache: 'no-store', signal: ctl.signal }).then(x => x.json()); clearTimeout(tt); HV = { v: (r && +r.v) || 1, t: Date.now(), fallo: false }; }
   catch (e) { HV = { v: HV.v || 1, t: Date.now() - 15e5, fallo: true }; }
   localStorage.setItem('mb1_hv', JSON.stringify(HV)); if (HV.v >= 2) vaciarColaH2(); return HV.v; }
-function encolarH2(t, d) { if (REAL) return; S.colaH2 = S.colaH2 || []; if (t === 'avance') S.colaH2 = S.colaH2.filter(([x, y]) => !(x === 'avance' && y.m === d.m)); S.colaH2.push([t, d]); if (S.colaH2.length > 800) S.colaH2.shift(); save(); }
+function encolarH2(t, d) { if (REAL) return; S.colaH2 = S.colaH2 || []; if (t === 'avance' || t === 'foto') S.colaH2 = S.colaH2.filter(([x, y]) => !(x === t && y.m === d.m)); S.colaH2.push([t, d]); if (S.colaH2.length > 800) S.colaH2.shift(); save(); }
 function vaciarColaH2() { const c = S.colaH2 || []; if (!SHEET || REAL || !c.length || !navigator.onLine || !(HV.v >= 2)) return; S.colaH2 = []; save(); c.forEach(([t, d]) => hojaPost(t, d)); }
-function hojaPost(tipoRegistro, datos) { if (!SHEET || REAL) return; const d = Object.assign({}, datos); delete d.codigo; if (NUEVOS_H.includes(tipoRegistro) && !(HV.v >= 2)) return encolarH2(tipoRegistro, d); fetch(SHEET, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ tipoRegistro, datos: d }) }).catch(() => { S.colaH = S.colaH || []; S.colaH.push([tipoRegistro, d]); if (S.colaH.length > 2000) S.colaH.shift(); save(); }); }
+function hojaPost(tipoRegistro, datos) { if (!SHEET || REAL) return; const d = Object.assign({}, datos); delete d.codigo; if (NUEVOS_H.includes(tipoRegistro) && !(HV.v >= (tipoRegistro === 'foto' ? 3 : 2))) return encolarH2(tipoRegistro, d); fetch(SHEET, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ tipoRegistro, datos: d }) }).catch(() => { S.colaH = S.colaH || []; S.colaH.push([tipoRegistro, d]); if (S.colaH.length > 2000) S.colaH.shift(); save(); }); }
 function vaciarColaH() { const c = S.colaH || []; if (!SHEET || !c.length || !navigator.onLine) return; S.colaH = []; save(); c.forEach(([t, d]) => hojaPost(t, d)); }
 window.addEventListener('online', () => setTimeout(() => { vaciarColaH(); verHoja(true); }, 1500)); setTimeout(vaciarColaH, 4000); setTimeout(() => verHoja(), 2500);
 function enviar(path, data) { if (esPiloto() || REAL) return; if (!SRV) { if (SHEET) { if (path === 'api/actividad') hojaPost('actividad', data); else if (path === 'api/avance') hojaPost('avance', filaAvance(data)); else if (path === 'api/resultado') hojaPost('resultados', filaRes(data)); } return; } api(path, data).catch(() => { S.cola = S.cola || []; S.cola.push([path, data]); if (S.cola.length > 2000) S.cola.shift(); save(); }); }
@@ -135,9 +135,10 @@ async function cargarHojaDatos() { if (SRV || !SHEET || !S.sesion || !esMando())
   if (!k) { HOJAD = Object.assign(HOJAD, { t: Date.now(), n: null, err: 'clave' }); return; }
   try { const v = await verHoja(true); if (v < 2) { HOJAD = Object.assign(HOJAD, { t: Date.now(), n: null, err: HV.fallo ? 'red' : 'v1' }); return; }
     const g = h => fetch(SHEET + '?hoja=' + h + '&clave=' + encodeURIComponent(k), { cache: 'no-store' }).then(r => r.json());
-    const [av] = await Promise.all([g('avance')]); if (av && av.error) { HOJAD = Object.assign(HOJAD, { t: Date.now(), n: null, err: 'clave' }); return; }
+    const [av, fo] = await Promise.all([g('avance'), v >= 3 ? g('fotos').catch(() => []) : Promise.resolve([])]); if (av && av.error) { HOJAD = Object.assign(HOJAD, { t: Date.now(), n: null, err: 'clave' }); return; }
     const A = limpioH(av);
     const nA = fusionarAvances(leerCodigos(A.map(r => r.mb1).join('\n')).ok, 'Hoja (automático)');
+    if (Array.isArray(fo)) { S.fotoIdx = {}; fo.forEach(r => { if (r && r.m && r.hay) S.fotoIdx[r.m] = 1; }); }
     save(); HOJAD = Object.assign(HOJAD, { t: Date.now(), err: '', n: { a: nA, r: 0, l: 0, ta: A.length, tr: 0, tl: 0 } });
   } catch (e) { HOJAD = Object.assign(HOJAD, { t: Date.now(), n: null, err: 'red' }); } }
 function actualizarHoja() { HOJAD.t = 0; HOJAD.err = 'cargando'; render(); cargarHojaDatos().then(() => { if (tab !== 'alc') render(); }); }
@@ -188,8 +189,8 @@ function prevMat(v) { const el = $('#lprev'); if (!el) return; LG.m = v; const r
 function vLoginCadete() {
   const P2 = LG.paso;
   if (P2 === 'confirma' && LG.dato) return `<section class="card lconf"><h3>¿Eres tú?</h3>${fichaDatos(LG.dato)}<p class="mini">Datos tomados de la ${esc(LG.fuente || 'lista oficial')}. Si algo está mal, avisa a la Mesa de Inglés.</p><button class="btn big" onclick="confirmarCadete()">Sí, soy yo · Entrar</button><button class="btn ghost" style="width:100%;margin-top:8px" onclick="noSoyYo()">No soy yo</button></section>`;
-  if (P2 === 'apellido') return `<section class="card"><h3>Confirma tu identidad</h3><p class="mini">Matrícula <b>${esc(LG.m)}</b>. Escribe tu <b>primer apellido</b> para buscar tus datos en la lista oficial.</p><label>Primer apellido<input id="lap" autocomplete="family-name" autocapitalize="characters" placeholder="Ej. Hernandez" onkeydown="if(event.key==='Enter')buscarEnLinea()"></label><button class="btn big" onclick="buscarEnLinea()" ${LG.buscando ? 'disabled' : ''}>${LG.buscando ? 'Buscando…' : 'Buscar mis datos'}</button><div class="row"><button class="btn ghost" style="flex:1" onclick="LG.paso='mat';render()">← Cambiar matrícula</button>${LG.intentos >= 1 ? `<button class="btn ghost" style="flex:1" onclick="LG.paso='manual';render()">Capturar a mano</button>` : ''}</div></section>`;
-  if (P2 === 'manual') { const est = S.padronEstricto && padronTodo().length; return est ? `<section class="card aviso"><h3>Matrícula no encontrada</h3><p>La matrícula <b>${esc(LG.m)}</b> no aparece en la lista de este equipo. Revisa que esté bien escrita o acude a la Mesa de Inglés para que te den de alta.</p><button class="btn" onclick="LG.paso='mat';render()">← Corregir matrícula</button></section>` :
+  if (P2 === 'apellido') return `<section class="card"><h3>Confirma tu identidad</h3><p class="mini">Matrícula <b>${esc(LG.m)}</b>. Escribe tu <b>primer apellido</b> para buscar tus datos en la lista oficial.</p><label>Primer apellido<input id="lap" autocomplete="family-name" autocapitalize="characters" placeholder="Ej. Hernandez" onkeydown="if(event.key==='Enter')buscarEnLinea()"></label><button class="btn big" onclick="buscarEnLinea()" ${LG.buscando ? 'disabled' : ''}>${LG.buscando ? 'Buscando…' : 'Buscar mis datos'}</button><div class="row"><button class="btn ghost" style="flex:1" onclick="LG.paso='mat';render()">← Cambiar matrícula</button>${LG.intentos >= 1 && !exigeLista() ? `<button class="btn ghost" style="flex:1" onclick="LG.paso='manual';render()">Capturar a mano</button>` : ''}</div></section>`;
+  if (P2 === 'manual') { const est = exigeLista(); return est ? `<section class="card aviso"><h3>Matrícula no encontrada</h3><p>La matrícula <b>${esc(LG.m)}</b> no aparece en la lista de este equipo. Revisa que esté bien escrita o acude a la Mesa de Inglés para que te den de alta.</p><button class="btn" onclick="LG.paso='mat';render()">← Corregir matrícula</button></section>` :
     `<section class="card"><h3>Completa tus datos</h3><p class="mini">No encontramos la matrícula <b>${esc(LG.m)}</b> en la lista de este equipo. Escríbelos completos y tal cual la lista oficial; se guardan una sola vez con tu matrícula.</p>
     <label>Nombre(s)<input id="mnom" autocomplete="given-name" placeholder="Ej. Maria Fernanda"></label><div class="g2"><label>Primer apellido<input id="map1" autocomplete="family-name" placeholder="Ej. Lopez"></label><label>Segundo apellido<input id="map2" placeholder="Ej. Ramirez"></label></div>
     <label class="chk"><input type="checkbox" id="m1ap"> Solo tengo un apellido</label>
@@ -487,7 +488,118 @@ function cerrarVistaCadete() {
   S.sesion = { perfil: prevP, nombre: S.sesion.nombre.replace(/ \(vista\)$/, ''), m: prevM || S.sesion.m };
   tab = 'vista'; save(); render();
 }
-const AV = () => Object.values(S.avances).filter(a => a.pf !== 'planta' && a.m !== PILOTO.m);
+function exigeLista() { return S.padronEstricto !== false && padronTodo().length > 0; }
+function fotoDe(m) { if (!m) return ''; if (S.fotos && S.fotos[m]) return S.fotos[m]; try { if (window.PERFIL && PERFIL.fotoDe) return PERFIL.fotoDe(m) || ''; } catch (e) { } try { return localStorage.getItem('mb1_foto_' + m) || ''; } catch (e) { return ''; } }
+function avatarAv(a, tam) { const f = fotoDe(a.m), yo = a.yo || {}, c = yo.co || yo.color || '#6366f1', n = a.n || a.nombre || ''; const ini = (n.trim().split(/\s+/).filter(Boolean).map((w, i, arr) => i === 0 || i === arr.length - 2 ? w[0] : '').join('') || '?').toUpperCase(); return `<span class="pav ${tam || 'sm'}" style="--pc:${esc(c)}">${f ? `<img src="${f}" alt="">` : yo.e || yo.emoji ? `<b class="emo">${esc(yo.e || yo.emoji)}</b>` : `<b>${esc(ini)}</b>`}</span>`; }
+function enviarFoto(m, nombre, dataUrl) {
+  if (!m) return; S.fotos = S.fotos || {}; if (dataUrl) S.fotos[m] = dataUrl; else delete S.fotos[m]; save();
+  if (REAL) return; const d = { ts: tsLocal(), m, nombre: nombre || '', foto: dataUrl || '', equipo: EQUIPO };
+  if (SHEET && !SRV) hojaPost('foto', d); else if (SRV) enviar('api/foto', d);
+}
+function datoCadete(m) {
+  const a = S.avances[m], p = S.perfiles[m];
+  const o = a ? Object.assign({}, a) : (p && p.perfil === 'cadete' && !p.piloto && !p.vistaSolo ? payload(p) : null);
+  if (!o) return null; o.n = (p && p.nombre) || o.n; o.a = (p && p.anio) || o.a; o.gp = (p && p.gp) || o.gp; o.gi = (p && p.gi) || o.gi; o.cia = (p && p.cia) || o.cia;
+  if (p && p.yo) o.yo = { g: (p.yo.gustos || []).slice(), c: (p.yo.cuesta || []).slice(), t: p.yo.texto || '', f: p.yo.foto ? 1 : 0, e: p.yo.emoji, co: p.yo.color, fr: p.yo.frase };
+  o._local = !!p; o._foto = fotoDe(m); return o;
+}
+function AV() {
+  const seen = new Set(), out = [];
+  Object.values(S.avances).forEach(a => { if (a && a.pf !== 'planta' && a.m !== PILOTO.m) { out.push(a); seen.add(a.m); } });
+  Object.values(S.perfiles || {}).forEach(p => { if (p && p.perfil === 'cadete' && !p.piloto && !p.vistaSolo && p.m && !seen.has(p.m)) { try { out.push(payload(p)); seen.add(p.m); } catch (e) { } } });
+  return out;
+}
+let FICHA = null;
+function abrirFicha(m, modo) { FICHA = { m, modo: modo || 'ver' }; if (tab !== 'avance') tab = 'avance'; render(); scrollTo(0, 0); if (FICHA.modo === 'ver') pedirFoto(m); }
+function cerrarFicha() { FICHA = null; render(); }
+async function pedirFoto(m) {
+  if (fotoDe(m)) return; const k = localStorage.getItem('mb1_hk') || '';
+  if (!SHEET || !k || SRV || !navigator.onLine) return;
+  try { const r = await fetch(SHEET + '?hoja=foto&m=' + encodeURIComponent(m) + '&clave=' + encodeURIComponent(k), { cache: 'no-store' }).then(x => x.json());
+    if (r && r.ok && r.foto && r.foto.indexOf('data:image') === 0) { S.fotos = S.fotos || {}; S.fotos[m] = r.foto; save(); if (FICHA && FICHA.m === m) render(); } } catch (e) { }
+}
+function vFicha() {
+  if (!FICHA) return ''; const a = datoCadete(FICHA.m); if (!a) { FICHA = null; return ''; }
+  if (FICHA.modo === 'editar') return vEditarCadete(a);
+  if (FICHA.modo === 'fusionar') return vFusionarCadete(a);
+  const pr = a.pr || {}, yo = a.yo || {}, sl = soloLectura();
+  const act = ((SRVDATA && SRVDATA.act) || []).filter(r => normMat(r.m) === normMat(a.m)).slice(0, 12);
+  const chips = (arr) => (arr || []).length ? `<div class="pchips">${arr.map(x => `<span>${esc(x)}</span>`).join('')}</div>` : '<p class="mini">—</p>';
+  return `<section class="card ficha" id="fichaCadete"><div class="row sp"><h3>Ficha del cadete</h3><button class="btn sm ghost" onclick="cerrarFicha()">Cerrar</button></div>
+    <div class="ficha-top">${avatarAv(a, 'xl')}<div><h2>${esc(a.n)}</h2><p class="mini">${esc(a.m)} · ${a.a ? a.a + '° año' : ''}${a.gp ? ' · grupo ' + esc(a.gp) : ''}${a.gi ? ' · inglés ' + esc(a.gi) : ''}${a.cia ? ' · ' + esc(a.cia) : ''}${a._local ? ' · en este equipo' : ''}</p>${yo.fr ? `<p class="pfrase">“${esc(yo.fr)}”</p>` : ''}</div></div>
+    <div class="kpis k4"><div><b>${a.q || 0}</b><span>Preguntas</span></div><div><b>${a.est ?? '—'}</b><span>Estimado</span></div><div><b>${pr.lp ?? '—'}</b><span>Pts listening</span></div><div><b>${pr.cn ? pr.co + '/' + pr.cn : '—'}</b><span>Completa</span></div></div>
+    <div class="g2"><section class="card"><h3>Gustos</h3>${chips(yo.g)}</section><section class="card pcuesta"><h3>Le cuesta</h3>${chips(yo.c)}${yo.t ? `<blockquote>${esc(yo.t)}</blockquote>` : ''}</section></div>
+    <section class="card"><h3>Práctica</h3><p class="mini">Listening: ${pr.ln ? `${pr.lo}/${pr.ln} aciertos · ${pr.lp} pts` : 'sin datos'} · Completa la oración: ${pr.cn ? `${pr.co}/${pr.cn} · ${pr.cp} pts` : 'sin datos'} · Vocabulario: ${pr.va != null ? `${pr.va} palabras dominadas` + (pr.vt ? ' de ' + pr.vt : '') + (pr.vp ? ' · ' + pr.vp + ' para hoy' : '') : 'sin datos en este resumen'}.</p>
+      ${a.tools && Object.keys(a.tools).length ? `<p class="mini">Herramientas: ${Object.entries(a.tools).filter(([k]) => !k.includes(':')).map(([k, v]) => `${esc(NOMT[k] || k)} (${v})`).join(' · ')}</p>` : ''}</section>
+    ${act.length ? `<section class="card"><h3>Actividad reciente (Hoja)</h3><div class="tw"><table><tr><th>Fecha</th><th>Ejercicio</th><th>Tema</th><th>Preg.</th><th>Aciertos</th></tr>${act.map(r => `<tr><td>${esc(r.ts)}</td><td>${esc(r.tipo)}</td><td>${esc(r.tema)}</td><td>${r.preguntas}</td><td>${r.aciertos}</td></tr>`).join('')}</table></div></section>` : ''}
+    ${a._foto ? '' : (yo.f ? '<p class="mini">Tiene foto en la Hoja; se cargará si hay clave de lectura e internet.</p>' : '<p class="mini">Este cadete no ha compartido foto (puede usar un avatar).</p>')}
+    <div class="row">${sl ? '<p class="mini">Directora: solo consulta. Administración puede editar, fusionar o quitar este registro.</p>' : `<button class="btn" onclick='abrirFicha(${JSON.stringify(a.m)},"editar")'>✏️ Editar datos</button><button class="btn ghost" onclick='abrirFicha(${JSON.stringify(a.m)},"fusionar")'>Fusionar duplicado</button><button class="btn ghost" onclick='delAv(${JSON.stringify(a.m)})'>Quitar del mando</button>`}</div></section>`;
+}
+function vEditarCadete(a) {
+  return `<section class="card ficha" id="fichaCadete"><div class="row sp"><h3>Editar datos del cadete</h3><button class="btn sm ghost" onclick='abrirFicha(${JSON.stringify(a.m)})'>Cancelar</button></div>
+    <p class="mini">Corrige el nombre (tal cual la lista oficial, sin agregar acentos), la matrícula, el año y los grupos. Si cambias la matrícula, el historial de este equipo se mueve con ella.</p>
+    <label>Nombre completo<input id="fenom" value="${esc(a.n)}"></label>
+    <label>Matrícula<input id="femat" autocapitalize="characters" value="${esc(a.m)}"></label>
+    <div class="g2"><label>Año<select id="feanio">${[1, 2, 3, 4].map(n => `<option value="${n}" ${+a.a === n ? 'selected' : ''}>${anioTxt(n)}</option>`).join('')}</select></label><label>Compañía<input id="fecia" value="${esc(a.cia || '')}"></label></div>
+    <div class="g2"><label>Grupo pedagógico<input id="fegp" value="${esc(a.gp || '')}"></label><label>Grupo de inglés<input id="fegi" value="${esc(a.gi || '')}"></label></div>
+    <button class="btn big" onclick="guardarEdicionCadete()">Guardar cambios</button></section>`;
+}
+function vFusionarCadete(a) {
+  const otros = AV().filter(x => x.m !== a.m);
+  const dups = otros.filter(x => sinAcento(x.n) === sinAcento(a.n));
+  const opts = (dups.length ? dups : otros).map(x => `<option value="${esc(x.m)}">${esc(x.n)} · ${esc(x.m)}${sinAcento(x.n) === sinAcento(a.n) ? ' (mismo nombre)' : ''}</option>`).join('');
+  return `<section class="card ficha" id="fichaCadete"><div class="row sp"><h3>Fusionar duplicado</h3><button class="btn sm ghost" onclick='abrirFicha(${JSON.stringify(a.m)})'>Cancelar</button></div>
+    <p class="mini">Se conservan los datos de <b>${esc(a.n)}</b> (${esc(a.m)}) y se une el registro que elijas. El otro se quita. No se puede deshacer en este equipo.</p>
+    ${opts ? `<label>Unir con<select id="feorig">${opts}</select></label><button class="btn" onclick='hacerFusion(${JSON.stringify(a.m)})'>Fusionar</button>` : '<p class="mini">No hay otros cadetes en el Centro de mando para unir.</p>'}</section>`;
+}
+function guardarEdicionCadete() {
+  if (bloquearEscritura()) return; if (!FICHA) return;
+  const old = FICHA.m, n = ($('#fenom').value || '').trim(), m = normMat($('#femat').value);
+  const extra = { a: parseInt($('#feanio').value) || '', gp: norm($('#fegp').value), gi: norm($('#fegi').value), cia: ($('#fecia').value || '').trim() };
+  if (!n || n.split(/\s+/).length < 2) return toast('Escribe el nombre completo (nombre y apellidos).');
+  if (!m || !/^[A-Z0-9-]{5,20}$/.test(m)) return toast('Revisa la matrícula.');
+  if (m !== old && (S.avances[m] || (S.perfiles[m] && S.perfiles[m].perfil === 'cadete'))) {
+    if (!confirm('Ya hay un cadete con la matrícula ' + m + '. ¿Fusionar este registro en esa matrícula?')) return;
+    moverCadete(old, m, { n, ...extra }); hacerFusion(m, old); return;
+  }
+  moverCadete(old, m, { n, ...extra }); FICHA = { m, modo: 'ver' }; save(); render(); toast('Datos actualizados.');
+}
+function moverCadete(old, m, d) {
+  const ap = (obj, key) => { if (!obj[old]) return; const x = obj[old]; if (m !== old) { delete obj[old]; } x.m = m; if (d.n) { if (key === 'av') x.n = d.n; else x.nombre = d.n; } if (d.a !== undefined) { if (key === 'av') x.a = d.a; else x.anio = d.a; } if (d.gp !== undefined) x.gp = d.gp; if (d.gi !== undefined) x.gi = d.gi; if (d.cia !== undefined) x.cia = d.cia; obj[m] = x; };
+  ap(S.avances, 'av'); if (S.perfiles[old] || S.perfiles[m]) ap(S.perfiles, 'pf');
+  if (S.fotos && S.fotos[old]) { if (m !== old) { S.fotos[m] = S.fotos[old]; delete S.fotos[old]; } }
+  try { if (m !== old) { const f = localStorage.getItem('mb1_foto_' + old); if (f) { localStorage.setItem('mb1_foto_' + m, f); localStorage.removeItem('mb1_foto_' + old); } } } catch (e) { }
+  const i = (S.padron || []).findIndex(x => normMat(x.m) === normMat(old)); if (i >= 0) S.padron[i] = Object.assign({}, S.padron[i], { m, n: d.n, a: d.a, gp: d.gp, gi: d.gi, cia: d.cia });
+}
+function hacerFusion(dest, orig) {
+  if (bloquearEscritura()) return; orig = orig || ($('#feorig') && $('#feorig').value); if (!dest || !orig || dest === orig) return toast('Elige el registro a unir.');
+  if (!confirm('¿Unir ' + orig + ' en ' + dest + '? El registro ' + orig + ' se quitará.')) return;
+  const d = S.avances[dest] || (S.perfiles[dest] ? payload(S.perfiles[dest]) : null);
+  const o = S.avances[orig] || (S.perfiles[orig] ? payload(S.perfiles[orig]) : null);
+  if (!d && !o) return toast('No hay datos para unir.');
+  const base = (d && o) ? ((d.ts || 0) >= (o.ts || 0) ? d : o) : (d || o);
+  const other = base === d ? o : d;
+  const merged = Object.assign({}, base, { m: dest, n: (d && d.n) || base.n, a: (d && d.a) || base.a, gp: (d && d.gp) || base.gp, gi: (d && d.gi) || base.gi, cia: (d && d.cia) || base.cia });
+  merged.dias = Object.assign({}, (other && other.dias) || {}, base.dias || {});
+  merged.tools = {}; [other && other.tools, base.tools].forEach(t => { if (t) Object.entries(t).forEach(([k, v]) => { merged.tools[k] = (merged.tools[k] || 0) + v; }); });
+  merged.yo = (d && d.yo && ((d.yo.t) || (d.yo.c || []).length || d.yo.f)) ? d.yo : ((o && o.yo) || (d && d.yo));
+  S.avances[dest] = merged; delete S.avances[orig];
+  if (S.perfiles[orig]) { if (!S.perfiles[dest]) { S.perfiles[dest] = S.perfiles[orig]; S.perfiles[dest].m = dest; } delete S.perfiles[orig]; }
+  if (S.fotos && S.fotos[orig]) { if (!S.fotos[dest]) S.fotos[dest] = S.fotos[orig]; delete S.fotos[orig]; }
+  try { const f = localStorage.getItem('mb1_foto_' + orig); if (f && !localStorage.getItem('mb1_foto_' + dest)) localStorage.setItem('mb1_foto_' + dest, f); localStorage.removeItem('mb1_foto_' + orig); } catch (e) { }
+  S.padron = (S.padron || []).filter(x => normMat(x.m) !== normMat(orig));
+  FICHA = { m: dest, modo: 'ver' }; save(); render(); toast('Registros unidos en ' + dest + '.');
+}
+function posiblesDuplicados(L) {
+  const byN = {}, out = []; L.forEach(a => { const k = sinAcento(a.n); (byN[k] = byN[k] || []).push(a); });
+  Object.values(byN).forEach(g => { if (g.length > 1) out.push(g); }); return out;
+}
+function cardDuplicados(L) {
+  const d = posiblesDuplicados(L); if (!d.length) return '';
+  return `<section class="card aviso" id="duplicados"><h3>Posibles duplicados (${d.length} nombre${d.length > 1 ? 's' : ''})</h3><p class="mini">Mismo nombre con distinta matrícula. Revisa y, si son la misma persona, ábrela y usa «Fusionar duplicado».</p>
+    ${d.map(g => `<p class="mini">${g.map(a => `<button class="btn sm ghost" onclick='abrirFicha(${JSON.stringify(a.m)})'>${esc(a.n)} · ${esc(a.m)}</button>`).join(' ')}</p>`).join('')}</section>`;
+}
+
 function filtrar(list) { return list.filter(a => (!fil.anio || String(a.a) === fil.anio) && (!fil.gp || a.gp === fil.gp) && (!fil.gi || a.gi === fil.gi) && (!fil.dia || (a.dias && a.dias[fil.dia]))); }
 function filtros(conDia = true) { const all = AV().concat(S.padron), opts = k => [...new Set(all.map(a => a[k]).filter(Boolean))].sort();
   return `<div class="filtros"><select onchange="fil.anio=this.value;render()"><option value="">Todos los años</option>${[1, 2, 3, 4].map(a => `<option ${fil.anio == a ? 'selected' : ''} value="${a}">${a}° año</option>`).join('')}</select>
@@ -503,15 +615,15 @@ function mAvance() {
   const L = filtrar(AV()), act7 = L.filter(a => { const u = ultimo(a); return u && diasEntre(u, hoy()) < 7; }).length, q = L.reduce((s, a) => s + (a.q || 0), 0), e = prom(L.map(a => a.est));
   const acc = {}; for (let i = 13; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); const k = hoy(d); acc[k.slice(8) + '/' + k.slice(5, 7)] = L.filter(a => a.dias && a.dias[k]).length; }
   const tools = {}; L.forEach(a => Object.entries(a.tools || {}).forEach(([k, v]) => { if (!k.includes(':')) { const n = NOMT[k] || k; tools[n] = (tools[n] || 0) + v; } }));
-  return `${avisoHoja()}${soloLectura() ? '' : `<section class="card"><h3>Importar códigos de avance <small class="mini">(respaldo opcional)</small></h3><textarea id="impin" placeholder="Pega aquí los mensajes con códigos MB1… (puedes pegar un chat completo)"></textarea><div class="row"><button class="btn" id="btnimp" onclick="importar()">Importar</button><label class="btn ghost">Chat exportado (.txt)<input type="file" accept=".txt,text/plain" hidden onchange="importArchivo(this)"></label></div></section>`}
+  return `${avisoHoja()}${FICHA ? vFicha() : ''}${soloLectura() ? '' : `<section class="card"><h3>Importar códigos de avance <small class="mini">(respaldo opcional)</small></h3><textarea id="impin" placeholder="Pega aquí los mensajes con códigos MB1… (puedes pegar un chat completo)"></textarea><div class="row"><button class="btn" id="btnimp" onclick="importar()">Importar</button><label class="btn ghost">Chat exportado (.txt)<input type="file" accept=".txt,text/plain" hidden onchange="importArchivo(this)"></label></div></section>`}
   ${filtros()}<section class="kpis"><div><b id="kpi-cad">${L.length}</b><span>Cadetes con avance</span></div><div><b>${act7}</b><span>Activos en 7 días</span></div><div><b>${q}</b><span>Preguntas respondidas</span></div><div><b>${e ?? '—'}</b><span>Promedio estimado</span></div></section>
-  <section class="card"><h3>Accesos por día (14 días)</h3>${barras(acc)}</section><div class="cols"><section class="card"><h3>Herramientas más usadas</h3>${barras(Object.fromEntries(Object.entries(tools).sort((a, b) => b[1] - a[1]).slice(0, 8)))}</section><section class="card"><h3>Aciertos por tema (%)</h3>${barras(dominio(L), 100)}</section></div>${cuestaResumen(L)}
+  <section class="card"><h3>Accesos por día (14 días)</h3>${barras(acc)}</section><div class="cols"><section class="card"><h3>Herramientas más usadas</h3>${barras(Object.fromEntries(Object.entries(tools).sort((a, b) => b[1] - a[1]).slice(0, 8)))}</section><section class="card"><h3>Aciertos por tema (%)</h3>${barras(dominio(L), 100)}</section></div>${cuestaResumen(L)}${cardDuplicados(L)}
   <section class="card"><div class="row sp"><h3>Detalle por cadete</h3><div class="row"><button class="btn sm ghost" onclick="expAvance('xlsx')">Excel</button><button class="btn sm ghost" onclick="expAvance('csv')">CSV</button></div></div>${tablaAv(L)}</section>`;
 }
 function cuestaResumen(L) { const c = {}; let n = 0; L.forEach(a => { const k = (a.yo && a.yo.c) || []; if (k.length) n++; k.forEach(x => { const t = x.replace(/^\S+\s/, ''); c[t] = (c[t] || 0) + 1; }); }); if (!n) return ''; return `<section class="card"><h3>Lo que más les cuesta (según su perfil · ${n} cadete(s))</h3>${barras(Object.fromEntries(Object.entries(c).sort((a, b) => b[1] - a[1])))}<p class="mini">El detalle y el texto de cada cadete está en la tabla y en el Excel.</p></section>`; }
-function filaAv(a) { const pr = a.pr || {}, yo = a.yo || {}; return { Nombre: a.n, Matrícula: a.m, Año: a.a, 'Grupo ped.': a.gp, 'Grupo inglés': a.gi, Compañía: a.cia, Preguntas: a.q, 'Listening (pts)': pr.lp ?? '', 'Listening (aciertos)': pr.ln ? `${pr.lo}/${pr.ln}` : '', 'Completa (aciertos)': pr.cn ? `${pr.co}/${pr.cn}` : '', 'Le cuesta': (yo.c || []).map(x => x.replace(/^\S+\s/, '')).join(', '), 'En sus palabras': yo.t || '', Gustos: (yo.g || []).map(x => x.replace(/^\S+\s/, '')).join(', '), 'Puntaje inicio': a.ini ?? '', 'Puntaje estimado': a.est ?? '', 'Meta año': METAS[a.a] || '', 'Última práctica': ultimo(a), 'Semana preguntas': (a.w || [])[0] || 0, 'Semana aciertos': (a.w || [])[1] || 0, ...dominio([a]), 'Código recibido': new Date(a.ts).toLocaleString('es-MX') }; }
-function tablaAv(L) { if (!L.length) return '<p class="mini">Aún no hay avances importados.</p>'; return `<div class="tw"><table><tr><th>Nombre</th><th>Año</th><th>Grupo</th><th>Preg.</th><th>🎧</th><th>Inicio</th><th>Estimado</th><th>Última</th><th></th></tr>${L.sort((a, b) => (a.a - b.a) || a.n.localeCompare(b.n)).map(a => `<tr><td>${esc(a.n)}<small>${esc(a.m)}</small>${a.yo && ((a.yo.c || []).length || a.yo.t) ? `<small class="cuesta" title="${esc(a.yo.t || '')}">Le cuesta: ${esc((a.yo.c || []).map(x => x.replace(/^\S+\s/, '')).join(', ') || '—')}${a.yo.t ? ' · “' + esc(a.yo.t.slice(0, 60)) + (a.yo.t.length > 60 ? '…' : '') + '”' : ''}</small>` : ''}</td><td>${a.a}°</td><td>${esc(a.gp)}${a.gi ? ' / ' + esc(a.gi) : ''}</td><td>${a.q}</td><td>${a.pr && a.pr.ln ? `${a.pr.lp}<small>${Math.round(100 * a.pr.lo / a.pr.ln)}%</small>` : '—'}</td><td>${a.ini ?? '—'}</td><td><b class="${a.est >= METAS[a.a] ? 'okt' : ''}">${a.est ?? '—'}</b></td><td>${ultimo(a)}</td><td>${soloLectura() ? '' : `<button class="btn sm ghost" onclick="delAv('${esc(a.m)}')">✕</button>`}</td></tr>`).join('')}</table></div>`; }
-function delAv(m) { if (bloquearEscritura()) return; if (confirm('¿Quitar este avance del Centro de mando?')) { delete S.avances[m]; save(); render(); } }
+function filaAv(a) { const pr = a.pr || {}, yo = a.yo || {}; return { Nombre: a.n, Matrícula: a.m, Año: a.a, 'Grupo ped.': a.gp, 'Grupo inglés': a.gi, Compañía: a.cia, Preguntas: a.q, 'Listening (pts)': pr.lp ?? '', 'Listening (aciertos)': pr.ln ? `${pr.lo}/${pr.ln}` : '', 'Completa (aciertos)': pr.cn ? `${pr.co}/${pr.cn}` : '', 'Le cuesta': (yo.c || []).map(x => x.replace(/^\S+\s/, '')).join(', '), 'En sus palabras': yo.t || '', Gustos: (yo.g || []).map(x => x.replace(/^\S+\s/, '')).join(', '), Foto: (yo.f || fotoDe(a.m)) ? 'Sí' : '', 'Puntaje inicio': a.ini ?? '', 'Puntaje estimado': a.est ?? '', 'Meta año': METAS[a.a] || '', 'Última práctica': ultimo(a), 'Semana preguntas': (a.w || [])[0] || 0, 'Semana aciertos': (a.w || [])[1] || 0, ...dominio([a]), 'Código recibido': new Date(a.ts).toLocaleString('es-MX') }; }
+function tablaAv(L) { if (!L.length) return '<p class="mini">Aún no hay avances importados.</p>'; return `<div class="tw"><table><tr><th></th><th>Nombre</th><th>Año</th><th>Grupo</th><th>Preg.</th><th>🎧</th><th>Inicio</th><th>Estimado</th><th>Última</th><th></th></tr>${L.sort((a, b) => (a.a - b.a) || a.n.localeCompare(b.n)).map(a => `<tr class="crow${FICHA && FICHA.m === a.m ? ' on' : ''}" onclick='abrirFicha(${JSON.stringify(a.m)})'><td>${avatarAv(a, 'sm')}</td><td>${esc(a.n)}<small>${esc(a.m)}${(a.yo && a.yo.f) || fotoDe(a.m) ? ' · 📷' : ''}</small>${a.yo && ((a.yo.c || []).length || a.yo.t) ? `<small class="cuesta" title="${esc(a.yo.t || '')}">Le cuesta: ${esc((a.yo.c || []).map(x => x.replace(/^\S+\s/, '')).join(', ') || '—')}${a.yo.t ? ' · “' + esc(a.yo.t.slice(0, 60)) + (a.yo.t.length > 60 ? '…' : '') + '”' : ''}</small>` : ''}</td><td>${a.a}°</td><td>${esc(a.gp)}${a.gi ? ' / ' + esc(a.gi) : ''}</td><td>${a.q}</td><td>${a.pr && a.pr.ln ? `${a.pr.lp}<small>${Math.round(100 * a.pr.lo / a.pr.ln)}%</small>` : '—'}</td><td>${a.ini ?? '—'}</td><td><b class="${a.est >= METAS[a.a] ? 'okt' : ''}">${a.est ?? '—'}</b></td><td>${ultimo(a)}</td><td>${soloLectura() ? `<button class="btn sm ghost" onclick='event.stopPropagation();abrirFicha(${JSON.stringify(a.m)})'>Ver</button>` : `<button class="btn sm ghost" onclick='event.stopPropagation();abrirFicha(${JSON.stringify(a.m)})'>Ficha</button><button class="btn sm ghost" onclick='event.stopPropagation();delAv(${JSON.stringify(a.m)})'>✕</button>`}</td></tr>`).join('')}</table></div>`; }
+function delAv(m) { if (bloquearEscritura()) return; if (confirm('¿Quitar este avance del Centro de mando?')) { delete S.avances[m]; if (S.fotos) delete S.fotos[m]; if (FICHA && FICHA.m === m) FICHA = null; save(); render(); } }
 function fusionarAvances(ok, fuente) { let n = 0;
   ok.filter(o => o.m !== PILOTO.m).forEach(o => { const prev = S.avances[o.m]; if (!prev || prev.ts < o.ts || (prev.ts === o.ts && fuente === 'código de avance')) { S.avances[o.m] = o; n++; } (o.ex || []).forEach(e => { if (!S.registro.some(r => r.m === o.m && r.code === e[0])) S.registro.push({ n: o.n, m: o.m, tipo: o.pf, anio: o.a, gp: o.gp, gi: o.gi, code: e[0], pts: e[1], sal: e[2], folio: e[3], fecha: e[4], fuente, valido: folio(o.m, e[0], e[1], e[2]) === e[3] }); }); });
   return n; }
@@ -572,8 +684,8 @@ function cardPadron() { const L = padronTodo(), por = [1, 2, 3, 4].map(a => [a, 
   <div class="kpis k4">${por.map(([a, n]) => `<div><b>${n}</b><span>${a}° año</span></div>`).join('')}</div>
   <p class="mini">${L.length ? `${L.length} cadete(s) en la lista de este equipo${(window.MB1PADRON || []).length ? ' (incluye la lista de la versión privada)' : ''}.${dupN.size ? ` <b class="badt">${dupN.size} nombre(s) repetido(s)</b>: revisa matrículas.` : ''}` : 'Aún no hay lista en este equipo.'} Columnas: Nombre completo, Matrícula, Año, Grupo pedagógico, Grupo de inglés, Compañía (los nombres se guardan tal cual).</p>
   <div class="row"><label class="btn">Cargar lista (Excel o CSV)<input type="file" hidden accept=".xlsx,.xls,.csv" onchange="padronArchivo(this)"></label><button class="btn ghost" onclick="plantillaPadron()">Descargar plantilla CSV</button>${S.padron.length ? `<button class="btn ghost" onclick="if(confirm('¿Vaciar la lista de este equipo?')){S.padron=[];save();render()}">Vaciar</button>` : ''}</div>
-  <label class="chk"><input type="checkbox" ${S.padronEstricto ? 'checked' : ''} onchange="S.padronEstricto=this.checked;save();toast(this.checked?'Solo entran matrículas de la lista':'Se permite captura guiada si la matrícula no está')"> Exigir que la matrícula esté en la lista (si no está, no se permite capturar a mano)</label>
-  <p class="mini">En los celulares de los cadetes: la lista también puede consultarse en línea desde la Hoja de registro (script v3, pide el primer apellido para confirmar) o incluirse en la versión privada (archivo padron.js). Estado de la Hoja: ${SRV ? 'servidor de intranet' : SHEET ? (HV.v >= 3 ? '<b class="okt">consulta de matrícula activa</b>' : 'script sin consulta de matrícula (actualízalo a v3)') : 'sin Hoja'}.</p></section>`; }
+  <label class="chk"><input type="checkbox" ${S.padronEstricto !== false ? 'checked' : ''} onchange="S.padronEstricto=this.checked;save();toast(this.checked?'Solo entran matrículas de la lista de este equipo':'Se permite captura guiada si la matrícula no está')"> Exigir que la matrícula esté en la lista (si no está, no se permite capturar a mano)</label>
+  <p class="mini">Esta opción viene <b>activada</b> cuando hay una lista en este equipo (o en la versión privada). Si no hay lista cargada aquí, la captura guiada sigue disponible para no bloquear a quien aún no aparece. En los celulares de los cadetes: la lista también puede consultarse en línea desde la Hoja de registro (script v3, pide el primer apellido para confirmar) o incluirse en la versión privada (archivo padron.js). Estado de la Hoja: ${SRV ? 'servidor de intranet' : SHEET ? (HV.v >= 3 ? '<b class="okt">consulta de matrícula activa</b>' : 'script sin consulta de matrícula (actualízalo a v3; los pasos están en el instructivo y en el archivo privado)') : 'sin Hoja'}.</p></section>`; }
 function mAjustes() { return `${cardPadron()}<section class="card"><h3>Cambio de códigos de acceso</h3><p class="mini">Escribe solo los que vas a cambiar. 6 a 24 caracteres: letras sin acento, números o guiones. Sin servidor, aplica solo en este equipo.</p>
   <label>Cadetes<input id="kc" placeholder="••••••"></label><label>Administración<input id="ka" placeholder="••••••"></label><div class="row"><button class="btn" onclick="guardarCodigos()">Guardar cambios</button><button class="btn ghost" onclick="if(soloLectura()){bloquearEscritura()}else if(confirm('¿Volver a los códigos iniciales?')){S.codes={...ORIGEN};save();toast('Códigos iniciales restaurados')}">Restaurar códigos iniciales</button></div></section>
   <section class="card"><h3>Material de práctica ALC</h3><p class="mini">Carga en este dispositivo el archivo que entrega la Mesa de Inglés para que los cadetes practiquen y hagan simulacros. Se guarda solo aquí; no se publica. No se muestran detalles de su contenido.</p>
@@ -630,7 +742,7 @@ function finPiloto() { if (esPiloto() || REAL) salirSandbox(); cerrarGuion(); lo
 
 /* ---------- ayuda: instructivos por perfil ---------- */
 const AYUDA = {
-  cadete: ['Cadete', `<h3>Entrada</h3><ol><li>Abre el enlace de la aplicación que comparte tu docente.</li><li>Elige <b>Cadete</b>, escribe tu <b>matrícula</b> y el código de acceso que te dio la Mesa de Inglés. Oprime <b>Continuar</b>.</li><li>La app busca tus datos con tu matrícula: si ya tienes perfil en ese equipo entras directo; si apareces en la lista, confirma «Sí, soy yo». Si te pide tu primer apellido, escríbelo para buscarte en la lista oficial.</li><li>Si no apareces, escribe tu nombre y tus dos apellidos completos, año y grupos. Se guardan una sola vez con tu matrícula.</li></ol><p class="mini">Usa siempre el mismo equipo y navegador: tu práctica se guarda ahí. Instálala: Android › menú ⋮ › Agregar a pantalla principal; iPhone › Compartir › Agregar a inicio. Después funciona sin internet.</p>
+  cadete: ['Cadete', `<h3>Entrada</h3><ol><li>Abre el enlace de la aplicación que comparte tu docente.</li><li>Elige <b>Cadete</b>, escribe tu <b>matrícula</b> y el código de acceso que te dio la Mesa de Inglés. Oprime <b>Continuar</b>.</li><li>La app busca tus datos con tu matrícula: si ya tienes perfil en ese equipo entras directo; si apareces en la lista, confirma «Sí, soy yo». Si te pide tu primer apellido, escríbelo para buscarte en la lista oficial.</li><li>Si no apareces y tu equipo no exige que estés en la lista, escribe tu nombre y tus dos apellidos completos, año y grupos. Se guardan una sola vez con tu matrícula.</li></ol><p class="mini">Usa siempre el mismo equipo y navegador: tu práctica se guarda ahí. Instálala: Android › menú ⋮ › Agregar a pantalla principal; iPhone › Compartir › Agregar a inicio. Después funciona sin internet.</p>
   <h3>Primer día</h3><p>En Hoy oprime <b>Descubre tu nivel</b> (12 preguntas, unos 8 min, sin calificación). Con 20 respuestas aparece tu puntaje estimado. Metas de egreso: 1/er. año 42 · 2/o. 48 · 3/er. 54 · 4/o. 60 (Barra I). El estimado no es un resultado oficial.</p>
   <h3>Uso diario (10 a 15 min)</h3><ol><li>Hoy › <b>Misión de hoy</b>: 8 preguntas con tu tema más débil y tus errores.</li><li>Hoy › <b>Tarjetas</b>: unos 5 minutos de repaso.</li><li>Practicar › <b>Listening rápido</b>: 5 audios. El listening vale la mitad del simulacro.</li><li><b>Vocab</b>: tus flash cards pendientes del día (unos 5 minutos).</li></ol><p class="mini">Escuchar reproduce la grabación de la pregunta (si no hay grabación, la voz en inglés de este dispositivo). Hay una pausa breve al inicio. Lento lo repite despacio. En Hoy puedes cambiar la voz de las lecturas (no cambia las grabaciones). Usa audífonos.</p>
   <h3>Simulacro</h3><ol><li>En <b>Simulacro</b> puedes hacer un ejercicio corto (20 preguntas, 15 min) o un simulacro completo (100 preguntas, 70 min).</li><li>Al terminar ves tu porcentaje y puedes revisar. Es práctica: no es un resultado oficial.</li></ol>
@@ -649,7 +761,7 @@ const AYUDA = {
   <h3>Completa la palabra 🧩</h3><p>En <b>Practicar › Completa la palabra</b>: oraciones con una palabra faltante (preposiciones, tiempos verbales, artículos, comparativos, modales, condicionales, voz pasiva, conectores, preguntas, verbos en pasado y vocabulario en contexto). Elige entre opciones o escríbela (+4 puntos). Al responder ves la explicación en español y escuchas la oración completa.</p>
   <p class="mini">Usa audífonos. La voz es la de tu dispositivo en inglés (cámbiala en Hoy › Audio). Tu progreso se guarda solo en este equipo; la coordinación ve qué ejercicio hiciste, cuántas preguntas y aciertos.</p>`],
   perfil: ['Mi perfil', `<h3>Personaliza tu perfil ✨</h3><ol><li>Toca tu foto o tus iniciales (arriba a la izquierda) › <b>Personalizar mi perfil</b>.</li><li><b>📷 Tomar foto</b> o <b>🖼️ Elegir de la galería</b>. Si no quieres foto, elige un avatar y el color de tu tarjeta.</li><li>Elige hasta 6 cosas que te gustan y escribe tu frase.</li><li>En <b>Lo que más me cuesta aprender</b> marca hasta 4 opciones y cuéntalo con tus palabras (200 caracteres).</li><li>Oprime <b>Guardar mi perfil</b>.</li></ol>
-  <p class="mini">Tu foto se guarda solo en este equipo y no se envía a nadie. Tus gustos y lo que te cuesta viajan en tu código de avance para que tu docente pueda apoyarte.</p>`],
+  <p class="mini">Si compartes tu foto, Administración de la Mesa de Inglés puede verla (se envía comprimida a la Hoja de registro). Tus gustos y lo que te cuesta también los ve tu docente, para apoyarte. Si prefieres no compartir la foto, usa un avatar: se queda solo en este equipo.</p>`],
   alc: ['ALC', `<h3>Qué contiene</h3><ul><li><b>Práctica</b>: reactivos con retroalimentación inmediata.</li><li><b>Simulacro</b>: un ejercicio más largo, con el tiempo y la revisión al final.</li></ul>
   <h3>Primera vez en un equipo</h3><p>Administración carga el material de práctica en <b>Ajustes</b>, con el archivo que entrega la Mesa de Inglés. Se guarda solo en ese dispositivo. Las pruebas que sí cuentan se presentan en la otra aplicación de la Mesa, no aquí.</p>`]
 };
