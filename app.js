@@ -1,6 +1,6 @@
 'use strict';
 /* Misión: Obtener la Barra I — versión PWA (sin servidor). Datos solo en este dispositivo. */
-const VER = '2.13';
+const VER = '2.14';
 // Firma: en el servidor de intranet la entrega /config.js (clave aleatoria por instalación, solo en la red local).
 // En la versión pública no hay clave secreta: es una suma de verificación pública (detecta errores de copia, no falsificación).
 const SECRET = window.MB1_FIRMA || 'MB1-PUBLICO-v2.3.1';
@@ -63,7 +63,7 @@ function forma(letra, nq = 100, semilla = '') {
 }
 let S = load(); const migraCodes = () => { S.codes = S.codes || {}; for (const k in ORIGEN) if (!esHash(S.codes[k])) S.codes[k] = ORIGEN[k]; }; migraCodes(); if (S.perfiles && S.perfiles[PILOTO.m]) { delete S.perfiles[PILOTO.m]; if (S.sesion && S.sesion.m === PILOTO.m) S.sesion = null; }
 function load() { try { return Object.assign(base(), JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { return base(); } }
-function base() { return { codes: { ...ORIGEN }, sesion: null, perfiles: {}, resultados: [], pases: [], avances: {}, padron: [], registro: [], pase: null, tema: 'claro' }; }
+function base() { return { codes: { ...ORIGEN }, sesion: null, perfiles: {}, resultados: [], pases: [], avances: {}, padron: [], registro: [], calif: [], califAdj: [], califCad: {}, califSombra: {}, pase: null, tema: 'claro' }; }
 function save() { if (REAL) return; localStorage.setItem(KEY, JSON.stringify(S)); }
 const P = () => S.sesion && S.perfiles[S.sesion.m];
 const esPiloto = () => S.sesion && S.sesion.m === PILOTO.m;
@@ -135,10 +135,12 @@ async function cargarHojaDatos() { if (SRV || !SHEET || !S.sesion || !esMando())
   if (!k) { HOJAD = Object.assign(HOJAD, { t: Date.now(), n: null, err: 'clave' }); return; }
   try { const v = await verHoja(true); if (v < 2) { HOJAD = Object.assign(HOJAD, { t: Date.now(), n: null, err: HV.fallo ? 'red' : 'v1' }); return; }
     const g = h => fetch(SHEET + '?hoja=' + h + '&clave=' + encodeURIComponent(k), { cache: 'no-store' }).then(r => r.json());
-    const [av, fo] = await Promise.all([g('avance'), v >= 3 ? g('fotos').catch(() => []) : Promise.resolve([])]); if (av && av.error) { HOJAD = Object.assign(HOJAD, { t: Date.now(), n: null, err: 'clave' }); return; }
+    const [av, fo, ca, so] = await Promise.all([g('avance'), v >= 3 ? g('fotos').catch(() => []) : Promise.resolve([]), v >= 4 ? g('calificaciones').catch(() => []) : Promise.resolve([]), v >= 4 ? g('sombras').catch(() => []) : Promise.resolve([])]); if (av && av.error) { HOJAD = Object.assign(HOJAD, { t: Date.now(), n: null, err: 'clave' }); return; }
     const A = limpioH(av);
     const nA = fusionarAvances(leerCodigos(A.map(r => r.mb1).join('\n')).ok, 'Hoja (automático)');
     if (Array.isArray(fo)) { S.fotoIdx = {}; fo.forEach(r => { if (r && r.m && r.hay) S.fotoIdx[r.m] = 1; }); }
+    if (Array.isArray(ca) && window.CALIF) CALIF.fusionarDesdeHoja(ca);
+    if (Array.isArray(so) && window.CALIF) CALIF.fusionarSombrasDesdeHoja(so);
     save(); HOJAD = Object.assign(HOJAD, { t: Date.now(), err: '', n: { a: nA, r: 0, l: 0, ta: A.length, tr: 0, tl: 0 } });
   } catch (e) { HOJAD = Object.assign(HOJAD, { t: Date.now(), n: null, err: 'red' }); } }
 function actualizarHoja() { HOJAD.t = 0; HOJAD.err = 'cargando'; render(); cargarHojaDatos().then(() => { if (tab !== 'alc') render(); }); }
@@ -228,7 +230,7 @@ async function buscarEnLinea() {
   LG.buscando = true; render(); let x = null;
   try { const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 9000); x = await fetch(SHEET + '?hoja=matricula&m=' + encodeURIComponent(LG.m) + '&ap=' + encodeURIComponent(sinAcento(ap)), { cache: 'no-store', signal: ctl.signal }).then(r => r.json()); clearTimeout(t); } catch (e) { x = { red: true }; }
   LG.buscando = false; LG.intentos++;
-  if (x && x.ok && x.n) { LG.dato = { n: String(x.n).trim(), m: LG.m, a: parseInt(x.a) || '', gp: norm(x.gp), gi: norm(x.gi), cia: String(x.cia || '').trim() }; LG.fuente = 'lista oficial (Hoja de la Mesa de Inglés)'; LG.paso = 'confirma'; return render(); }
+  if (x && x.ok && x.n) { LG.dato = { n: String(x.n).trim(), m: LG.m, a: parseInt(x.a) || '', gp: norm(x.gp), gi: norm(x.gi), cia: String(x.cia || '').trim(), ap: ap }; LG.fuente = 'lista oficial (Hoja de la Mesa de Inglés)'; LG.paso = 'confirma'; return render(); }
   render(); toast(x && x.red ? 'Sin conexión con la lista. Puedes capturar tus datos a mano.' : 'No encontramos esa matrícula con ese apellido. Revisa ambos datos.');
 }
 function confirmarCadete() { if (LG.dato) entrarCadete(LG.dato); }
@@ -238,10 +240,10 @@ function entrarManual() {
   if (nom.length < 2) return toast('Escribe tu nombre o nombres completos.'); if (a1.length < 2) return toast('Escribe tu primer apellido.'); if (!uno && a2.length < 2) return toast('Escribe tu segundo apellido (o marca «Solo tengo un apellido»).');
   if (!/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .-]+$/.test(nom + a1 + a2)) return toast('El nombre solo puede llevar letras.');
   if (!t('lgp')) return toast('Escribe tu grupo pedagógico.');
-  entrarCadete({ n: [nom, a1, uno ? '' : a2].filter(Boolean).join(' '), m: LG.m, a: +$('#lanio').value, gp: t('lgp'), gi: t('lgi'), cia: t('lcia'), manual: true });
+  entrarCadete({ n: [nom, a1, uno ? '' : a2].filter(Boolean).join(' '), m: LG.m, a: +$('#lanio').value, gp: t('lgp'), gi: t('lgi'), cia: t('lcia'), ap: a1, manual: true });
 }
 function entrarCadete(d) {
-  const m = d.m, nombre = d.n, extra = { anio: parseInt(d.a) || '', gp: norm(d.gp), gi: norm(d.gi), cia: String(d.cia || '').trim() };
+  const m = d.m, nombre = d.n, extra = { anio: parseInt(d.a) || '', gp: norm(d.gp), gi: norm(d.gi), cia: String(d.cia || '').trim() }; if (d.ap) extra.ap = String(d.ap).trim();
   if (SRV && !srvOk) { api('api/login', Object.assign({ perfil: 'cadete', nombre, m, codigo: LG.cod, equipo: EQUIPO }, extra)).then(r => { if (!r.ok) { LG.paso = 'mat'; render(); return toast(r.error || 'Código de acceso incorrecto.'); } srvOk = true; entrarCadete(d); srvOk = false; }).catch(() => { SRV = false; entrarCadete(d); }); return; }
   if (!srvOk && hc(LG.cod) !== S.codes.cadete) { LG.paso = 'mat'; render(); return toast('Código de acceso incorrecto.'); }
   const nuevo = !S.perfiles[m]; S.sesion = { perfil: 'cadete', nombre, m };
@@ -277,7 +279,7 @@ let tab = 'hoy';
 function vUsuario() {
   const p = P(), tabs = [['hoy', 'Hoy', '☀'], ['practicar', 'Practicar', '✎'], ['escucha', 'Listening', '🎧'], ['vocab', 'Vocab', '❖'], ['simulacro', 'Simulacro', '⏱'], ['sombra', 'Mi sombra', '⚑'], ['alc', 'ALC', '▤']];
   if (tab === 'ejercicio' || tab === 'aplicar') tab = 'simulacro';
-  const body = { hoy: vHoy, practicar: vPracticar, tecnicas: vTecnicas, simulacro: vEjercicio, ejercicio: vEjercicio, sombra: vSombra, alc: vAlc, vocab: vVocab, escucha: vEscucha, completa: vCompleta, perfil: vPerfilTab }[tab] || vHoy;
+  const body = { hoy: vHoy, practicar: vPracticar, tecnicas: vTecnicas, simulacro: vEjercicio, ejercicio: vEjercicio, sombra: vSombra, alc: vAlc, vocab: vVocab, escucha: vEscucha, completa: vCompleta, perfil: vPerfilTab, calif: vCalifTab }[tab] || vHoy;
   return `<header>${window.PERFIL ? `<button class="avbtn" onclick="tab='perfil';render();scrollTo(0,0)" title="Mi perfil">${PERFIL.avatar(p, 'sm')}</button>` : ''}<div><b>${esc(p.nombre)}</b><span>${S.sesion && S.sesion.vistaCadete ? 'Vista cadete · solo consulta' : (p.perfil === 'cadete' ? `${p.anio}° año · ${esc(p.gp || '')}` : 'Planta docente')}</span></div>${S.sesion && S.sesion.vistaCadete ? `<button class="ico" onclick="cerrarVistaCadete()" title="Volver al Centro de mando">←</button>` : ''}<button class="ico" onclick="ayuda()" title="Ayuda">?</button><button class="ico" onclick="tema()" title="Tema">◐</button><button class="ico" onclick="salir()" title="Cerrar sesión">⎋</button></header>
   ${p.piloto ? `<div class="pilotbar">Usuario piloto · demostración <button onclick="presentar(GUION_I||0)">Guion</button></div>` : ''}<main>${body(p)}</main><nav class="tabbar${tabs.length > 6 ? ' t7' : ''}">${tabs.map(([k, l, i]) => `<button class="${tab === k ? 'on' : ''}" onclick="tab='${k}';render();scrollTo(0,0)"><i>${i}</i>${l}</button>`).join('')}</nav>`;
 }
@@ -287,6 +289,7 @@ function vUsuario() {
 function vEscucha() { return '<div id="escmod">' + (window.ESCUCHA ? '' : '<section class="card"><p class="mini">Cargando Listening Lab…</p></section>') + '</div>'; }
 function vCompleta() { return '<div id="compmod">' + (window.COMPLETA ? '' : '<section class="card"><p class="mini">Cargando ejercicios…</p></section>') + '</div>'; }
 function vPerfilTab(p) { return window.PERFIL ? PERFIL.vPerfil(p) : '<section class="card"><p class="mini">Cargando perfil…</p></section>'; }
+function vCalifTab(p) { return window.CALIF ? CALIF.vCadete(p) : '<section class="card"><p class="mini">Cargando calificaciones…</p></section>'; }
 function escuchaHoy() { if (!window.ESCUCHA) return ''; let r; try { r = ESCUCHA.resumen(); } catch (e) { return ''; } return `<section class="card hoyvoc hoyesc" onclick="tab='escucha';render();scrollTo(0,0)"><div class="ic">🎧</div><div><h3>Listening Lab · tu área de oportunidad</h3><p class="mini">${r.hoy ? `<b>${r.hoy}</b> audios hoy · ` : 'Aún no entrenas el oído hoy · '}${r.pts.toLocaleString('es-MX')} pts · nivel ${r.nivel}. Dictado, diálogos, números y más.</p></div></section>`; }
 function vVocab() { return '<div id="vocabmod">' + (window.VOCAB ? '' : '<section class="card"><p class="mini">Cargando vocabulario…</p></section>') + '</div>'; }
 function vocabHoy() { if (!window.VOCAB) return ''; let r; try { r = VOCAB.resumen(); } catch (e) { return ''; } return `<section class="card hoyvoc" onclick="tab='vocab';render();scrollTo(0,0)"><div class="ic">❖</div><div><h3>Vocabulario · flash cards</h3><p class="mini">${r.pend ? `<b>${r.pend}</b> tarjeta(s) para repasar hoy` : 'Sin repasos pendientes'} · ${r.nuevas} nuevas disponibles · ALCPT y ALC</p></div></section>`; }
@@ -309,7 +312,7 @@ function vHoy(p) {
   const est = estimado(p), meta = METAS[p.anio] || 60, min = Math.round((p.dias[hoy()] || {}).min || 0), pct = Math.min(100, Math.round(100 * min / p.meta)), tec = tecnicaHoy();
   const hecha = (p.tools['mision:' + hoy()] || 0) > 0, w = semana(p, lunes()), ranking = rankingSemanal(p, 'anio').slice(0, 3);
   const sinEnviar = !p.piloto && p.perfil === 'cadete' && p.ans.length >= 10 && (!p.ultAvance || Date.now() - p.ultAvance > 3 * 864e5);
-  return `${window.PERFIL ? PERFIL.hoyCard(p) : ''}${p.perfil === 'planta' ? cardPase(p) : ''}${sinEnviar ? `<section class="card aviso"><b>Tu coordinadora todavía no ve tu práctica.</b> <button class="btn sm" onclick="enviarAvance();document.querySelector('#avout').scrollIntoView()">Generar mi código de avance</button></section>` : ''}
+  return `${window.PERFIL ? PERFIL.hoyCard(p) : ''}${window.CALIF ? CALIF.hoyCard(p) : ''}${p.perfil === 'planta' ? cardPase(p) : ''}${sinEnviar ? `<section class="card aviso"><b>Tu coordinadora todavía no ve tu práctica.</b> <button class="btn sm" onclick="enviarAvance();document.querySelector('#avout').scrollIntoView()">Generar mi código de avance</button></section>` : ''}
   ${!p.ans.length ? `<section class="card aviso2"><h3>Descubre tu nivel</h3><p class="mini">12 preguntas, unos 8 minutos, sin calificación. Con ellas la app arma tu ruta.</p><button class="btn" onclick="iniciar('nivel')">Empezar</button></section>` : ''}
   <section class="kpis k3"><div><b>${xp(p).toLocaleString('es-MX')}</b><span>XP</span></div><div><b>${racha(p)}</b><span>Días seguidos</span></div><div><b>${est ?? '—'}</b><span>Puntaje estimado</span></div></section>
   <section class="card hero"><div class="ring" style="--p:${pct}"><b>${min}</b><span>de ${p.meta} min</span></div><div><h2>Meta diaria</h2><p>${pct >= 100 ? '¡Cumplida! 🎖' : 'Racha: ' + racha(p) + ' día(s)'}</p><button class="btn" onclick="iniciar('mision')">${hecha ? 'Repetir' : 'Iniciar'} Misión de hoy · 8</button></div></section>
@@ -343,7 +346,7 @@ function vPracticar(p) {
    <button class="tile" onclick="iniciar('listening')"><b>Listening rápido</b><span>5 audios</span></button>
    <button class="tile" onclick="iniciar('debil')"><b>Mi tema más débil</b><span>${esc(TEMAS[temaDebil(p)] || '—')}</span></button>
    <button class="tile" onclick="iniciarTarjetas()"><b>Tarjetas</b><span>Repetición espaciada</span></button></section>
-  <section class="grid g-new"><button class="tile tnew tesc" onclick="tab='escucha';render();scrollTo(0,0)"><b>🎧 Listening Lab</b><span>8 juegos · niveles y rachas</span></button><button class="tile tnew tcomp" onclick="tab='completa';render();scrollTo(0,0)"><b>🧩 Completa la palabra</b><span>Gramática, verbos y vocabulario</span></button><button class="tile tnew tverb" onclick="tab='vocab';render();scrollTo(0,0)"><b>⟳ Verbos</b><span>Regulares e irregulares en Vocab</span></button><button class="tile tnew" onclick="tab='tecnicas';render();scrollTo(0,0)"><b>★ Técnicas</b><span>Cómo estudiar mejor</span></button></section>
+  <section class="grid g-new"><button class="tile tnew tesc" onclick="tab='escucha';render();scrollTo(0,0)"><b>🎧 Listening Lab</b><span>8 juegos · niveles y rachas</span></button><button class="tile tnew tcomp" onclick="tab='completa';render();scrollTo(0,0)"><b>🧩 Completa la palabra</b><span>Gramática, verbos y vocabulario</span></button><button class="tile tnew tverb" onclick="tab='vocab';render();scrollTo(0,0)"><b>⟳ Verbos</b><span>Regulares e irregulares en Vocab</span></button><button class="tile tnew" onclick="tab='tecnicas';render();scrollTo(0,0)"><b>★ Técnicas</b><span>Cómo estudiar mejor</span></button><button class="tile tnew" onclick="tab='calif';render();scrollTo(0,0)"><b>📊 Calificaciones</b><span>Historial oficial vs meta</span></button></section>
   <section class="card"><h3>Práctica por tema</h3>${Object.entries(TEMAS).map(([k, l]) => { const t = p.tema[k] || [0, 0]; const d = t[0] ? Math.round(100 * t[1] / t[0]) : 0; return `<button class="tema" onclick="iniciar('tema:${k}')"><span>${l}</span><div class="bar sm"><i style="width:${d}%"></i></div><small>${t[0] ? d + '%' : '—'}</small></button>`; }).join('')}</section>`;
 }
 function temaDebil(p) { let best = 'tie', v = 2; for (const k in TEMAS) { if (k === 'lin') continue; const t = p.tema[k]; const d = t && t[0] >= 3 ? t[1] / t[0] : 0.5; if (d < v) { v = d; best = k; } } return best; }
@@ -459,17 +462,18 @@ function calif(ok) { const p = P(), id = TC.ids[TC.i], c = p.cards[id] || { box:
 /* ---------- Centro de mando ---------- */
 let fil = { anio: '', gp: '', gi: '', dia: '' }, grupoPor = 'gp';
 function vMando() {
-  let tabs = [['mando', 'Mando'], ['avance', 'Avance'], ['antig', 'Antigüedad'], ['estad', 'Estadística'], ['areas', 'Áreas'], ['riesgo', 'En riesgo'], ['actividad', 'Actividad'], ['alc', 'ALC'], ['vista', 'Vista cadete']];
+  let tabs = [['mando', 'Mando'], ['avance', 'Avance'], ['calif', 'Calificaciones'], ['antig', 'Antigüedad'], ['estad', 'Estadística'], ['areas', 'Áreas'], ['riesgo', 'En riesgo'], ['actividad', 'Actividad'], ['alc', 'ALC'], ['vista', 'Vista cadete']];
   if (esAdmin()) tabs.push(['ajustes', 'Ajustes']);
   if (soloLectura() && tab === 'ajustes') tab = 'mando';
   if (tab === 'eval' || tab === 'aplic' || tab === 'aplicadm') tab = 'mando';
-  const body = { alc: vAlc, actividad: mActividad, avance: mAvance, antig: mAntig, estad: mEstad, areas: mAreas, riesgo: mRiesgo, ajustes: mAjustes, mando: mMando, vista: mVistaCadete }[tab] || mAvance;
+  const body = { alc: vAlc, actividad: mActividad, avance: mAvance, calif: vCalifMando, antig: mAntig, estad: mEstad, areas: mAreas, riesgo: mRiesgo, ajustes: mAjustes, mando: mMando, vista: mVistaCadete }[tab] || mAvance;
   const rol = esDirectora() ? 'Directora · solo consulta' : 'Administración';
   const ban = soloLectura() ? `<section class="card aviso"><b>Modo consulta.</b> Puedes ver todas las secciones; no puedes cambiar ajustes, importar, borrar ni editar datos. El control total lo tiene Administración.</section>` : '';
   return `<header><div><b>Centro de mando</b><span>${esc(S.sesion.nombre)} · ${rol}</span></div><button class="ico" onclick="ayuda()" title="Instructivos">?</button><button class="ico" onclick="tema()" title="Tema">◐</button><button class="ico" onclick="salir()" title="Cerrar sesión">⎋</button></header>
   <nav class="tabs">${tabs.map(([k, l]) => `<button class="${tab === k || (k === 'aplic' && tab === 'aplicadm') ? 'on' : ''}" data-tab="${k}" onclick="tab='${k}';render()">${l}</button>`).join('')}</nav><main class="wide">${ban}${body()}</main>`;
 }
 
+function vCalifMando() { return window.CALIF ? CALIF.vMando() : '<section class="card"><p class="mini">Cargando calificaciones…</p></section>'; }
 function mVistaCadete() {
   return `<section class="card"><h3>Vista de la pantalla del cadete</h3><p class="mini">Consulta cómo se ve la app para el cadete (Hoy, Practicar, Técnicas, Simulacro, Mi sombra, ALC). En modo Directora no se guarda práctica ni se envía nada.</p>
   <button class="btn" onclick="abrirVistaCadete()">Abrir vista cadete (solo lectura)</button></section>`;
@@ -531,7 +535,7 @@ function vFicha() {
     <div class="g2"><section class="card"><h3>Gustos</h3>${chips(yo.g)}</section><section class="card pcuesta"><h3>Le cuesta</h3>${chips(yo.c)}${yo.t ? `<blockquote>${esc(yo.t)}</blockquote>` : ''}</section></div>
     <section class="card"><h3>Práctica</h3><p class="mini">Listening: ${pr.ln ? `${pr.lo}/${pr.ln} aciertos · ${pr.lp} pts` : 'sin datos'} · Completa la oración: ${pr.cn ? `${pr.co}/${pr.cn} · ${pr.cp} pts` : 'sin datos'} · Vocabulario: ${pr.va != null ? `${pr.va} palabras dominadas` + (pr.vt ? ' de ' + pr.vt : '') + (pr.vp ? ' · ' + pr.vp + ' para hoy' : '') : 'sin datos en este resumen'}.</p>
       ${a.tools && Object.keys(a.tools).length ? `<p class="mini">Herramientas: ${Object.entries(a.tools).filter(([k]) => !k.includes(':')).map(([k, v]) => `${esc(NOMT[k] || k)} (${v})`).join(' · ')}</p>` : ''}</section>
-    ${act.length ? `<section class="card"><h3>Actividad reciente (Hoja)</h3><div class="tw"><table><tr><th>Fecha</th><th>Ejercicio</th><th>Tema</th><th>Preg.</th><th>Aciertos</th></tr>${act.map(r => `<tr><td>${esc(r.ts)}</td><td>${esc(r.tipo)}</td><td>${esc(r.tema)}</td><td>${r.preguntas}</td><td>${r.aciertos}</td></tr>`).join('')}</table></div></section>` : ''}
+    ${window.CALIF ? `<section class="card"><div class="row sp"><h3>Calificaciones oficiales</h3><button class="btn sm ghost" onclick="tab='calif';render()">Abrir sección</button></div>${CALIF.fichaResumen(a.m)}</section>` : ''}${act.length ? `<section class="card"><h3>Actividad reciente (Hoja)</h3><div class="tw"><table><tr><th>Fecha</th><th>Ejercicio</th><th>Tema</th><th>Preg.</th><th>Aciertos</th></tr>${act.map(r => `<tr><td>${esc(r.ts)}</td><td>${esc(r.tipo)}</td><td>${esc(r.tema)}</td><td>${r.preguntas}</td><td>${r.aciertos}</td></tr>`).join('')}</table></div></section>` : ''}
     ${a._foto ? '' : (yo.f ? '<p class="mini">Tiene foto en la Hoja; se cargará si hay clave de lectura e internet.</p>' : '<p class="mini">Este cadete no ha compartido foto (puede usar un avatar).</p>')}
     <div class="row">${sl ? '<p class="mini">Directora: solo consulta. Administración puede editar, fusionar o quitar este registro.</p>' : `<button class="btn" onclick='abrirFicha(${JSON.stringify(a.m)},"editar")'>✏️ Editar datos</button><button class="btn ghost" onclick='abrirFicha(${JSON.stringify(a.m)},"fusionar")'>Fusionar duplicado</button><button class="btn ghost" onclick='delAv(${JSON.stringify(a.m)})'>Quitar del mando</button>`}</div></section>`;
 }
@@ -570,6 +574,7 @@ function moverCadete(old, m, d) {
   if (S.fotos && S.fotos[old]) { if (m !== old) { S.fotos[m] = S.fotos[old]; delete S.fotos[old]; } }
   try { if (m !== old) { const f = localStorage.getItem('mb1_foto_' + old); if (f) { localStorage.setItem('mb1_foto_' + m, f); localStorage.removeItem('mb1_foto_' + old); } } } catch (e) { }
   const i = (S.padron || []).findIndex(x => normMat(x.m) === normMat(old)); if (i >= 0) S.padron[i] = Object.assign({}, S.padron[i], { m, n: d.n, a: d.a, gp: d.gp, gi: d.gi, cia: d.cia });
+  (S.calif || []).forEach(r => { if (normMat(r.m) === normMat(old)) { r.m = m; if (d.n) r.n = d.n; if (d.a !== undefined && d.a !== '') r.a = d.a; if (d.gp !== undefined) r.gp = d.gp; if (d.gi !== undefined) r.gi = d.gi; } });
 }
 function hacerFusion(dest, orig) {
   if (bloquearEscritura()) return; orig = orig || ($('#feorig') && $('#feorig').value); if (!dest || !orig || dest === orig) return toast('Elige el registro a unir.');
@@ -588,6 +593,7 @@ function hacerFusion(dest, orig) {
   if (S.fotos && S.fotos[orig]) { if (!S.fotos[dest]) S.fotos[dest] = S.fotos[orig]; delete S.fotos[orig]; }
   try { const f = localStorage.getItem('mb1_foto_' + orig); if (f && !localStorage.getItem('mb1_foto_' + dest)) localStorage.setItem('mb1_foto_' + dest, f); localStorage.removeItem('mb1_foto_' + orig); } catch (e) { }
   S.padron = (S.padron || []).filter(x => normMat(x.m) !== normMat(orig));
+  (S.calif || []).forEach(r => { if (normMat(r.m) === normMat(orig)) { r.m = dest; if (merged.n) r.n = merged.n; } });
   FICHA = { m: dest, modo: 'ver' }; save(); render(); toast('Registros unidos en ' + dest + '.');
 }
 function posiblesDuplicados(L) {
@@ -685,7 +691,7 @@ function cardPadron() { const L = padronTodo(), por = [1, 2, 3, 4].map(a => [a, 
   <p class="mini">${L.length ? `${L.length} cadete(s) en la lista de este equipo${(window.MB1PADRON || []).length ? ' (incluye la lista de la versión privada)' : ''}.${dupN.size ? ` <b class="badt">${dupN.size} nombre(s) repetido(s)</b>: revisa matrículas.` : ''}` : 'Aún no hay lista en este equipo.'} Columnas: Nombre completo, Matrícula, Año, Grupo pedagógico, Grupo de inglés, Compañía (los nombres se guardan tal cual).</p>
   <div class="row"><label class="btn">Cargar lista (Excel o CSV)<input type="file" hidden accept=".xlsx,.xls,.csv" onchange="padronArchivo(this)"></label><button class="btn ghost" onclick="plantillaPadron()">Descargar plantilla CSV</button>${S.padron.length ? `<button class="btn ghost" onclick="if(confirm('¿Vaciar la lista de este equipo?')){S.padron=[];save();render()}">Vaciar</button>` : ''}</div>
   <label class="chk"><input type="checkbox" ${S.padronEstricto !== false ? 'checked' : ''} onchange="S.padronEstricto=this.checked;save();toast(this.checked?'Solo entran matrículas de la lista de este equipo':'Se permite captura guiada si la matrícula no está')"> Exigir que la matrícula esté en la lista (si no está, no se permite capturar a mano)</label>
-  <p class="mini">Esta opción viene <b>activada</b> cuando hay una lista en este equipo (o en la versión privada). Si no hay lista cargada aquí, la captura guiada sigue disponible para no bloquear a quien aún no aparece. En los celulares de los cadetes: la lista también puede consultarse en línea desde la Hoja de registro (script v3, pide el primer apellido para confirmar) o incluirse en la versión privada (archivo padron.js). Estado de la Hoja: ${SRV ? 'servidor de intranet' : SHEET ? (HV.v >= 3 ? '<b class="okt">consulta de matrícula activa</b>' : 'script sin consulta de matrícula (actualízalo a v3; los pasos están en el instructivo y en el archivo privado)') : 'sin Hoja'}.</p></section>`; }
+  <p class="mini">Esta opción viene <b>activada</b> cuando hay una lista en este equipo (o en la versión privada). Si no hay lista cargada aquí, la captura guiada sigue disponible para no bloquear a quien aún no aparece. En los celulares de los cadetes: la lista también puede consultarse en línea desde la Hoja de registro (script v3/v4, pide el primer apellido para confirmar) o incluirse en la versión privada (archivo padron.js). Estado de la Hoja: ${SRV ? 'servidor de intranet' : SHEET ? (HV.v >= 4 ? '<b class="okt">matrícula, fotos y calificaciones activos (v4)</b>' : HV.v >= 3 ? '<b class="okt">consulta de matrícula activa (v3; actualiza a v4 para sincronizar calificaciones)</b>' : 'script sin consulta de matrícula (actualízalo a v4; los pasos están en el instructivo y en el archivo privado)') : 'sin Hoja'}.</p></section>`; }
 function mAjustes() { return `${cardPadron()}<section class="card"><h3>Cambio de códigos de acceso</h3><p class="mini">Escribe solo los que vas a cambiar. 6 a 24 caracteres: letras sin acento, números o guiones. Sin servidor, aplica solo en este equipo.</p>
   <label>Cadetes<input id="kc" placeholder="••••••"></label><label>Administración<input id="ka" placeholder="••••••"></label><div class="row"><button class="btn" onclick="guardarCodigos()">Guardar cambios</button><button class="btn ghost" onclick="if(soloLectura()){bloquearEscritura()}else if(confirm('¿Volver a los códigos iniciales?')){S.codes={...ORIGEN};save();toast('Códigos iniciales restaurados')}">Restaurar códigos iniciales</button></div></section>
   <section class="card"><h3>Material de práctica ALC</h3><p class="mini">Carga en este dispositivo el archivo que entrega la Mesa de Inglés para que los cadetes practiquen y hagan simulacros. Se guarda solo aquí; no se publica. No se muestran detalles de su contenido.</p>
@@ -716,7 +722,7 @@ function expRes(fmt) { exportar(filasRes(), 'Resultados', fmt); }
 function expRiesgo() { exportar(filasRiesgo(), 'En_riesgo', 'xlsx'); }
 function expTodo() { const av = AV().map(filaAv); exportar(av.length ? av : [{ Aviso: 'Sin avances importados' }], 'Avance', 'xlsx', [['En riesgo', filasRiesgo()], ['Padrón', S.padron.map(c => ({ Nombre: c.n, Matrícula: c.m, Año: c.a, 'Grupo ped.': c.gp, 'Grupo inglés': c.gi, Compañía: c.cia }))]]); }
 function respaldo() { const d = { ...S, sesion: null, _app: 'mision-barra-1', _ver: VER, _fecha: new Date().toISOString() }; descargar(new Blob([JSON.stringify(d)], { type: 'application/json' }), `Respaldo_MisionBarraI_${hoy()}.json`); }
-function restaurar(inp) { if (bloquearEscritura('Solo Administración puede restaurar respaldos.')) return; const f = inp.files[0]; if (!f) return; f.text().then(t => { const d = JSON.parse(t); if (d._app !== 'mision-barra-1') return toast('El archivo no es un respaldo de esta app.'); if (!confirm('Se combinarán los datos del respaldo con los de este equipo. ¿Continuar?')) return; for (const m in d.avances || {}) if (!S.avances[m] || S.avances[m].ts < d.avances[m].ts) S.avances[m] = d.avances[m]; for (const m in d.perfiles || {}) if (!S.perfiles[m]) S.perfiles[m] = d.perfiles[m]; ['resultados', 'registro', 'pases'].forEach(k => (d[k] || []).forEach(x => { if (!S[k].some(y => JSON.stringify(y) === JSON.stringify(x))) S[k].push(x); })); (d.padron || []).forEach(c => { if (!S.padron.some(x => x.m === c.m)) S.padron.push(c); }); if (d.codes) { S.codes = d.codes; migraCodes(); } save(); render(); toast('Respaldo restaurado'); }).catch(() => toast('No se pudo leer el archivo.')); }
+function restaurar(inp) { if (bloquearEscritura('Solo Administración puede restaurar respaldos.')) return; const f = inp.files[0]; if (!f) return; f.text().then(t => { const d = JSON.parse(t); if (d._app !== 'mision-barra-1') return toast('El archivo no es un respaldo de esta app.'); if (!confirm('Se combinarán los datos del respaldo con los de este equipo. ¿Continuar?')) return; for (const m in d.avances || {}) if (!S.avances[m] || S.avances[m].ts < d.avances[m].ts) S.avances[m] = d.avances[m]; for (const m in d.perfiles || {}) if (!S.perfiles[m]) S.perfiles[m] = d.perfiles[m]; ['resultados', 'registro', 'pases'].forEach(k => (d[k] || []).forEach(x => { if (!S[k].some(y => JSON.stringify(y) === JSON.stringify(x))) S[k].push(x); })); (d.padron || []).forEach(c => { if (!S.padron.some(x => x.m === c.m)) S.padron.push(c); }); (d.calif || []).forEach(r => { S.calif = S.calif || []; if (!S.calif.some(x => x.id === r.id)) S.calif.push(r); }); (d.califAdj || []).forEach(a => { S.califAdj = S.califAdj || []; if (!S.califAdj.some(x => x.id === a.id)) S.califAdj.push(a); }); S.califCad = Object.assign({}, S.califCad || {}, d.califCad || {}); S.califSombra = Object.assign({}, S.califSombra || {}, d.califSombra || {}); if (d.codes) { S.codes = d.codes; migraCodes(); } save(); render(); toast('Respaldo restaurado'); }).catch(() => toast('No se pudo leer el archivo.')); }
 
 window.addEventListener('popstate', () => { if (Q && Q.oficial) { history.pushState({ q: 1 }, ''); salida(); } });
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js');
@@ -760,6 +766,7 @@ const AYUDA = {
   <p>Puntos: 10 por acierto + bono de racha 🔥 (hasta +10) + bono por responder rápido + bono por nivel. Tu récord y tu mejor racha se guardan.</p>
   <h3>Completa la palabra 🧩</h3><p>En <b>Practicar › Completa la palabra</b>: oraciones con una palabra faltante (preposiciones, tiempos verbales, artículos, comparativos, modales, condicionales, voz pasiva, conectores, preguntas, verbos en pasado y vocabulario en contexto). Elige entre opciones o escríbela (+4 puntos). Al responder ves la explicación en español y escuchas la oración completa.</p>
   <p class="mini">Usa audífonos. La voz es la de tu dispositivo en inglés (cámbiala en Hoy › Audio). Tu progreso se guarda solo en este equipo; la coordinación ve qué ejercicio hiciste, cuántas preguntas y aciertos.</p>`],
+  calif: ['Calificaciones', `<h3>Calificaciones oficiales 📊</h3><p><b>Cadetes (solo consulta):</b> en Hoy › <b>Calificaciones oficiales</b> (o desde tu perfil) ves tus resultados oficiales de ALCPT, ALC y parciales, tu gráfica de progreso y cuánto te falta para tu meta. No puedes editarlas ni ver las de otros cadetes.</p><p><b>Administración:</b> en el Centro de mando › <b>Calificaciones</b> carga archivos Excel/CSV, PDF, Word (.docx) o imágenes; revisa el mapeo de columnas y el enlace automático con el padrón antes de guardar. Filtra por año, grupo, cadete, tipo, fechas o rango de calificación (aprobados/reprobados) y exporta exactamente lo filtrado a Excel.</p><p><b>Directora:</b> consulta todo sin poder cargar, editar ni borrar.</p>`],
   perfil: ['Mi perfil', `<h3>Personaliza tu perfil ✨</h3><ol><li>Toca tu foto o tus iniciales (arriba a la izquierda) › <b>Personalizar mi perfil</b>.</li><li><b>📷 Tomar foto</b> o <b>🖼️ Elegir de la galería</b>. Si no quieres foto, elige un avatar y el color de tu tarjeta.</li><li>Elige hasta 6 cosas que te gustan y escribe tu frase.</li><li>En <b>Lo que más me cuesta aprender</b> marca hasta 4 opciones y cuéntalo con tus palabras (200 caracteres).</li><li>Oprime <b>Guardar mi perfil</b>.</li></ol>
   <p class="mini">Si compartes tu foto, Administración de la Mesa de Inglés puede verla (se envía comprimida a la Hoja de registro). Tus gustos y lo que te cuesta también los ve tu docente, para apoyarte. Si prefieres no compartir la foto, usa un avatar: se queda solo en este equipo.</p>`],
   alc: ['ALC', `<h3>Qué contiene</h3><ul><li><b>Práctica</b>: reactivos con retroalimentación inmediata.</li><li><b>Simulacro</b>: un ejercicio más largo, con el tiempo y la revisión al final.</li></ul>
