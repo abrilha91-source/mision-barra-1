@@ -22,15 +22,15 @@
     <ul>
       <li><b>Semanal:</b> la pareja registra por lo menos una sesión (lo ideal son dos).</li>
       <li><b>Cada 3 semanas:</b> un simulacro corto de 20 preguntas (15 min) en la app. Es práctica, no calificación oficial; se anota en la sesión.</li>
-      <li><b>Oficial:</b> el próximo ALCPT se compara con el de noviembre de 2026. El avance es en puntos porcentuales (calificación nueva − calificación de noviembre). El senior cuyos juniors sumen más avance en porcentaje obtendrá un <b>beneficio adicional</b>.</li>
+      <li><b>Oficial:</b> el próximo ALCPT se compara con el de noviembre de 2026. El avance es en puntos porcentuales (calificación nueva − calificación de noviembre). El senior cuyos juniors sumen más avance en porcentaje obtendrá un <b>beneficio</b>.</li>
     </ul>`;
 
   const AYUDA_HTML = `<h3>Qué es el Programa Sombra</h3>
     <p>Es un programa de tutoría entre pares de la Mesa de Inglés. Un cadete con mejor resultado en el último ALCPT (noviembre de 2026) acompaña a compañeros que necesitan reforzar comprensión auditiva y lectura, vocabulario y gramática, usando esta misma aplicación.</p>
     <h3>Quiénes son Senior shadow y Junior shadow</h3>
-    <p>Sin importar el año: <b>Senior shadow</b> es quien obtuvo <b>más de 70</b> en el ALCPT de noviembre de 2026. <b>Junior shadow</b> es quien obtuvo <b>menos de 70</b>. A cada senior se le asignan juniors en cantidades lo más iguales posible; cada senior tiene al menos a uno de los juniors con el puntaje más bajo. Quien obtuvo <b>exactamente 70</b> queda pendiente y no se asigna en esta ronda. El senior ve a sus juniors en <b>Mi sombra</b>; el junior ve quién es su senior.</p>
+    <p>Sin importar el año: <b>Senior shadow</b> es quien obtuvo <b>70 o más</b> en el ALCPT de noviembre de 2026. <b>Junior shadow</b> es quien obtuvo <b>menos de 70</b>. A cada senior se le asignan juniors en cantidades lo más iguales posible; cada senior tiene al menos a uno de los juniors con el puntaje más bajo. El senior ve a sus juniors en <b>Mi sombra</b>; el junior ve quién es su senior.</p>
     ${DINAMICA}
-    <p>El senior cuyos juniors sumen más avance en porcentaje en el próximo ALCPT obtendrá un <b>beneficio adicional</b>.</p>`;
+    <p>El senior cuyos juniors sumen más avance en porcentaje en el próximo ALCPT obtendrá un <b>beneficio</b>.</p>`;
 
   function mulberry32(a) {
     return function () {
@@ -75,9 +75,9 @@
   function clasificar(lista) {
     const L = lista || listaBase();
     return {
-      seniors: L.filter(p => p.cal > 70),
+      seniors: L.filter(p => p.cal >= 70),
       juniors: L.filter(p => p.cal < 70),
-      pendientes70: L.filter(p => p.cal === 70)
+      pendientes70: []
     };
   }
 
@@ -230,7 +230,6 @@
     r.pendientes70 = c.pendientes70;
     const msg = `Se iniciará el Programa Sombra con ${r.n_sen} Senior shadow y ${r.n_jun} Junior shadow (ALCPT NOV 2026). ` +
       `Cada senior tendrá ${r.por_min === r.por_max ? r.por_min : r.por_min + ' o ' + r.por_max} juniors (semilla ${SEMILLA}). ` +
-      (c.pendientes70.length ? c.pendientes70.length + ' cadete(s) con exactamente 70 quedan pendientes y no se asignan. ' : '') +
       'Se guardará en este equipo y en la Hoja. ¿Continuar?';
     if (!silencio && !confirm(msg)) return;
     store();
@@ -346,7 +345,7 @@
     const filas = prog && prog.activo ? filasSeguimiento() : [];
     const puede = !sl && typeof esAdmin === 'function' && esAdmin();
     const cuenta = prev && prev.ok
-      ? `<p class="mini">Con ALCPT NOV 2026 en este equipo: <b>${prev.n_sen}</b> Senior shadow (&gt; 70), <b>${prev.n_jun}</b> Junior shadow (&lt; 70), <b>${(prev.pendientes70 || []).length}</b> con exactamente 70 (pendientes, no se asignan). Carga: ${prev.por_min === prev.por_max ? prev.por_min : prev.por_min + ' o ' + prev.por_max} juniors por senior. Semilla del reparto aleatorio: <b>${SEMILLA}</b>.</p>`
+      ? `<p class="mini">Con ALCPT NOV 2026 en este equipo: <b>${prev.n_sen}</b> Senior shadow (70 o más), <b>${prev.n_jun}</b> Junior shadow (menos de 70). Carga: ${prev.por_min === prev.por_max ? prev.por_min : prev.por_min + ' o ' + prev.por_max} juniors por senior. Semilla del reparto aleatorio: <b>${SEMILLA}</b>.</p>`
       : '<p class="mini">Para iniciar, actualiza las calificaciones de la Hoja (etiqueta ALCPT NOV 2026) en esta pestaña.</p>';
     const btn = puede
       ? `<div class="row"><button class="btn" id="btnIniciaSombra" onclick="SOMBRA.iniciar()">${prog && prog.activo ? 'Reiniciar asignación oficial' : 'Iniciar Programa Sombra'}</button>
@@ -375,7 +374,7 @@
     if (ofic && ofic.rol === 'senior') {
       const f = (filasSeguimiento().find(x => keyOf(x.senior) === keyOf(ofic.senior))) || { juniors: ofic.juniors.map(j => Object.assign({}, j, { nov: calNov(j), prox: calProx(j), avance: avanceDe(j) })), suma: null };
       oficial = `<section class="card" id="sombraCadeteCard"><h3>Eres Senior shadow</h3>
-        <p>Acompañas a <b>${(f.juniors || ofic.juniors).length}</b> Junior shadow. En el próximo ALCPT se suma el avance en porcentaje de tus juniors (respecto de noviembre de 2026). El senior con más avance sumado obtendrá un <b>beneficio adicional</b>.</p>
+        <p>Acompañas a <b>${(f.juniors || ofic.juniors).length}</b> Junior shadow. En el próximo ALCPT se suma el avance en porcentaje de tus juniors (respecto de noviembre de 2026). El senior con más avance sumado obtendrá un <b>beneficio</b>.</p>
         <div class="tw"><table><tr><th>Junior</th><th>Año / grupo</th><th>ALCPT nov. 2026</th><th>Próximo ALCPT</th><th>Avance</th></tr>${(f.juniors || []).map(j => `<tr><td>${esc(j.n)}<small>${esc(j.m || '')}</small></td><td>${j.a ? j.a + '° ' : ''}${esc(j.gp || '')}</td><td>${j.nov != null ? j.nov : (j.cal != null ? j.cal : '—')}</td><td>${j.prox != null ? j.prox : 'Pendiente'}</td><td>${fmtAv(j.avance)}</td></tr>`).join('')}</table></div>
         ${f.suma != null ? `<p class="mini">Avance sumado actual: ${fmtAv(f.suma)}.</p>` : '<p class="mini">El avance sumado aparecerá cuando se registre el próximo ALCPT oficial.</p>'}
         ${formSesion(p, ofic)}</section>`;
@@ -386,7 +385,7 @@
         <p class="mini">Tu ALCPT de noviembre de 2026: <b>${calNov(ofic.yo || p) ?? (ofic.yo && ofic.yo.cal) ?? '—'}</b>${calProx(ofic.yo || p) != null ? ' · próximo: <b>' + calProx(ofic.yo || p) + '</b> · avance ' + fmtAv(avanceDe(ofic.yo || p)) : ' · el próximo ALCPT oficial aún no está registrado'}.</p>
         ${formSesion(p, ofic)}</section>`;
     } else if (ofic && ofic.rol === 'pendiente') {
-      oficial = `<section class="card" id="sombraCadeteCard"><h3>Programa Sombra</h3><p>Tu calificación en el ALCPT de noviembre de 2026 fue exactamente 70, así que en esta ronda quedaste en lista de espera (no senior ni junior). La Mesa de Inglés te indicará si te incorpora más adelante.</p></section>`;
+      oficial = '';
     } else if (programa() && programa().activo) {
       oficial = `<section class="card" id="sombraCadeteCard"><h3>Programa Sombra</h3><p class="mini">El programa oficial ya inició. Si no ves tu asignación, actualiza tus calificaciones oficiales (matrícula y primer apellido) o pregunta a la Mesa de Inglés.</p></section>`;
     }
