@@ -180,3 +180,10 @@ th{color:var(--v)}[data-tema=oscuro] th{color:var(--v2)}
 .uso-off{background:#f6ecc8;color:#6b5310}
 .uso-sin{background:var(--bg);color:var(--mu)}
 #usoApp .tw td small{display:block;color:var(--mu)}
+
+/* v2.15 · Programa Sombra oficial */
+#sombraOficialCard details.sombra-din, #sombraCadeteCard details.sombra-din{margin-top:10px}
+#sombraOficialCard summary, .sombra-din summary{cursor:pointer;color:var(--v2);font-weight:600}
+#sombraOficialCard .sombra-sen td{background:var(--bg)}
+.sombra-ses{margin-top:12px}
+.sombra-ses .chk{margin-right:8px}

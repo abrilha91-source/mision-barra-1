@@ -1,4 +1,4 @@
-/* Misión: Obtener la Barra I · v2.14 · Calificaciones oficiales y Programa Sombra
+/* Misión: Obtener la Barra I · v2.15 · Calificaciones oficiales y Programa Sombra
    Administración: carga Excel/CSV, PDF, Word (.docx), imagen o paquete JSON con detección de tipo/fecha ("TIPO MES AÑO"),
    mapeo de columnas, enlace al padrón y revisión; filtros (año, grupo, cadete, tipo, etiqueta, fechas, rango, Programa Sombra);
    seguimiento del Programa Sombra entre exámenes y exportación a Excel (Noto Sans 10).
@@ -204,7 +204,7 @@
     store(); let n = 0;
     rows.forEach(r => {
       const k = sombraKey(r.m, r.n); if (!k) return;
-      if (r.activo) { S.califSombra[k] = { key: k, m: normMat0(r.m), n: String(r.n || '').trim(), pareja: String(r.pareja || ''), nota: String(r.nota || ''), activo: true, ts: Number(r.ts) || Date.now() }; n++; }
+      if (r.activo) { S.califSombra[k] = { key: k, m: normMat0(r.m), n: String(r.n || '').trim(), pareja: String(r.pareja || ''), nota: String(r.nota || ''), activo: true, ts: Number(r.ts) || Date.now(), rol: String(r.rol || ''), seniorMat: String(r.seniorMat || r.SeniorMat || ''), seniorNom: String(r.seniorNom || ''), a: r.a || r.anio || '', gp: String(r.gp || r.Grupo || ''), calBase: r.calBase != null ? Number(r.calBase) : (r.CalifBase != null ? Number(r.CalifBase) : undefined), etiquetaBase: String(r.etiquetaBase || r.EtiquetaBase || '') }; n++; }
       else if (S.califSombra[k] && (Number(r.ts) || 0) > (S.califSombra[k].ts || 0)) delete S.califSombra[k];
     });
     return n;
@@ -851,7 +851,8 @@
       if (v < 4) { SYNC_CAD = { m: p.m, cargando: false, err: 'v_ant', tried: true }; render(); return; }
       const r = await fetch(SHEET + '?hoja=calif_cadete&m=' + encodeURIComponent(normMat0(p.m)) + '&ap=' + encodeURIComponent(sinAc(ap)), { cache: 'no-store' }).then(x => x.json());
       if (r && r.ok) {
-        store(); S.califCad[normMat0(p.m)] = { ts: Date.now(), items: r.items || [] };
+        store(); S.califCad[normMat0(p.m)] = { ts: Date.now(), items: r.items || [], sombra: r.sombra || null };
+        if (r.sombra && window.SOMBRA) SOMBRA.aplicarSombraRemota(r.sombra);
         if (apManual) p.ap = apManual.trim();
         save();
         SYNC_CAD = { m: p.m, cargando: false, err: '', tried: true };
@@ -1003,8 +1004,9 @@
   }
 
   function vSombraCard(sl) {
+    const ofic = (window.SOMBRA && SOMBRA.cardAdmin(sl)) || '';
     const L = filasSombraProgreso();
-    return `<section class="card" id="calSombraCard"><div class="row sp"><h3>⚑ Seguimiento Programa Sombra (${L.length})</h3><div class="row">${L.length ? `<button class="btn sm ghost" onclick="CALIF.expSombra()">Exportar Sombra (Excel)</button>` : ''}${sl ? '' : `<button class="btn sm ghost" onclick="CALIF.importarSombras()">Sincronizar de Mi sombra</button>`}</div></div>
+    return `${ofic}<section class="card" id="calSombraCard"><div class="row sp"><h3>⚑ Seguimiento Programa Sombra (${L.length})</h3><div class="row">${L.length ? `<button class="btn sm ghost" onclick="CALIF.expSombra()">Exportar Sombra (Excel)</button>` : ''}${sl ? '' : `<button class="btn sm ghost" onclick="CALIF.importarSombras()">Sincronizar de Mi sombra</button>`}</div></div>
       <p class="mini">Seguimiento del progreso entre exámenes oficiales para cadetes marcados en el Programa Sombra (también puedes marcarlos con ☆/⚑ en la tabla de calificaciones).</p>
       ${sl ? '' : `<div class="row" style="margin:8px 0"><input id="som_q" list="calpadlist" placeholder="Cadete o matrícula del padrón" style="flex:2"><input id="som_par" placeholder="Pareja / tutor (opcional)" style="flex:1"><input id="som_nota" placeholder="Nota (opcional)" style="flex:1"><button class="btn sm" onclick="CALIF.addSombra()">+ Agregar</button></div>`}
       ${L.length ? `<div class="tw"><table><tr><th>Cadete</th><th>Año/Gr.</th><th>Pareja / nota</th><th>Exámenes</th><th>Primero → Último</th><th>Progreso</th><th>Meta</th>${sl ? '' : '<th></th>'}</tr>${L.map(x => {
@@ -1079,7 +1081,7 @@
     vCadete, vMando, hoyCard, fichaResumen, cargar: cargarArchivo, setSheet, setMapCol, setImpMeta, editImp: editImpItem, delImp: quitarImpItem,
     addManual: agregarImpManual, pegar: pegarBloque, guardarImp: guardarImportacion, cancelar: cancelarImportacion,
     nueva: abrirNueva, editar, borrar, guardarEdit: guardarEdicion, cancelarEdit: () => { EDIT = null; render(); }, autoEdit: autollenarEdicion,
-    toggleSombra, addSombra: agregarSombra, importarSombras: importarSombrasApp, expSombra,
+    toggleSombra, addSombra: agregarSombra, importarSombras: importarSombrasApp, expSombra, pushSombrasHoja,
     verAdj, descargarAdj, borrarAdj, cerrarAdj: () => { VERADJ = null; render(); },
     setF, limpiarF, exp, plantilla, sync: syncCadete, fusionarDesdeHoja, fusionarSombrasDesdeHoja, gradesForCadet,
     _et: buildEtiqueta, _filtrar: () => filtrarCalif(store().calif), _filasExp: () => filasExp(filtrarCalif(store().calif)),
