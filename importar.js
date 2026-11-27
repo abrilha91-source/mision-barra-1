@@ -178,14 +178,14 @@
     return R;
   }
   function jsonAItems(d) {
-    const arr = Array.isArray(d) ? d : (d && (d.preguntas || d.items || d.questions || d.reactivos || d.banco)) || null; const R = { items: [], sinClave: 0 };
+    const arr = Array.isArray(d) ? d : (d && (d.preguntas || d.items || d.questions || d.reactivos || d.banco)) || null; const R = { items: [], sinClave: 0 }, dst = d && (d.destino === 'alc' || d.destino === 'alcpt') ? d.destino : '';
     if (!Array.isArray(arr)) return R;
     arr.forEach(x => {
       if (!x || typeof x !== 'object') return; const o = (x.o || x.opciones || x.options || x.choices || ['a', 'b', 'c', 'd'].map(l => x[l] ?? x[l.toUpperCase()]).filter(v => v != null)).map(String).filter(Boolean);
       const q = String(x.q ?? x.pregunta ?? x.question ?? x.enunciado ?? ''), s = String(x.s ?? x.script ?? x.guion ?? ''), au = String(x.audio ?? x.au ?? '');
       let k = x.k ?? x.correcta ?? x.respuesta ?? x.answer ?? x.key; k = typeof k === 'number' ? (k >= 0 && k < o.length ? k : null) : claveDe(k, o);
       if (o.length < 2) return; if (k == null) { R.sinClave++; return; }
-      R.items.push({ q, o, k, s, au, img: String(x.imagen ?? x.img ?? x.image ?? ''), sec: x.sec === 'L' || x.sec === 'R' ? x.sec : secDe(x.seccion ?? x.section ?? '', s, au), e: String(x.e ?? x.explicacion ?? x.explanation ?? ''), tipo: String(x.tipo ?? x.tema ?? x.topic ?? ''), pas: String(x.pas ?? x.pasaje ?? x.passage ?? ''), n: String(x.n ?? x.num ?? '') });
+      R.items.push({ q, o, k, s, au, img: String(x.imagen ?? x.img ?? x.image ?? ''), sec: x.sec === 'L' || x.sec === 'R' ? x.sec : secDe(x.seccion ?? x.section ?? '', s, au), e: String(x.e ?? x.explicacion ?? x.explanation ?? ''), tipo: String(x.tipo ?? x.tema ?? x.topic ?? ''), pas: String(x.pas ?? x.pasaje ?? x.passage ?? ''), n: String(x.n ?? x.num ?? ''), destino: dst });
     });
     return R;
   }
@@ -248,7 +248,7 @@
   /* ---------- guardar ---------- */
   async function guardar(A, destino) {
     const imp = (await get('imp')) || { alcpt: [], alc: [] }, ya = new Set(imp.alcpt.concat(imp.alc).map(x => x.id)); let nuevas = 0, dup = 0;
-    A.items.map(aItem).forEach(it => { if (ya.has(it.id)) { dup++; return; } ya.add(it.id); imp[destino].push(it); nuevas++; });
+    A.items.forEach(raw => { const it = aItem(raw), dd = destino === 'auto' ? (raw.destino || 'alcpt') : destino; if (ya.has(it.id)) { dup++; return; } ya.add(it.id); imp[dd].push(it); nuevas++; });
     for (const m of A.medios) await put(m.key, { nombre: m.nombre, mime: m.mime, blob: m.blob, tipo: m.tipo, uso: 'pregunta' });
     const idx = (await get('recursos')) || [];
     for (const r of A.recursos) { const id = 'rec:' + hash(r.nombre + '|' + r.blob.size + '|' + (r.zipDe || '')); if (idx.some(x => x.id === id)) continue; await put(id, { nombre: r.nombre, mime: r.mime, blob: r.blob, tipo: r.tipo }); idx.push({ id, nombre: r.nombre, mime: r.mime, tipo: r.tipo, nota: r.nota, tam: r.blob.size, fecha: new Date().toISOString(), zip: r.zipDe || '' }); }
@@ -298,13 +298,15 @@
   function modal(html) { let w = document.getElementById('impprev'); if (w) w.remove(); w = document.createElement('div'); w.id = 'impprev'; w.innerHTML = `<div class="card impbox"><div class="row sp"><h3>Vista previa de la importación</h3><button class="btn sm ghost" type="button" id="impx">Cerrar</button></div><div class="impcuerpo">${html}</div></div>`; document.body.appendChild(w); w.querySelector('#impx').onclick = () => { A = null; w.remove(); }; return w; }
   function vistaPrevia(w) {
     const n = A.items.length, L = A.items.filter(i => i.sec === 'L').length, sk = A.archivos.reduce((s, f) => s + (f.sinClave || 0), 0);
+    const nLig = A.archivos.filter(f => f.medios).length, dP = A.items.filter(i => i.destino === 'alcpt').length, dA = A.items.filter(i => i.destino === 'alc').length, auto = dP + dA > 0;
+    const acciones = `${n ? `<label class="f">Agregar las preguntas a</label><select id="impdest">${auto ? `<option value="auto" selected>Según indica el archivo (ALCPT: ${dP} · ALC: ${dA})</option>` : ''}<option value="alcpt" ${auto ? '' : 'selected'}>Todas a ALCPT (práctica y simulacro ALCPT)</option><option value="alc">Todas a ALC (práctica y simulacro ALC)</option></select>` : ''}<div class="row"><button class="btn" type="button" id="impok" ${n || A.recursos.length || A.respaldos.length || A.materiales.length ? '' : 'disabled'}>Importar</button><button class="btn ghost" type="button" id="impno">Cancelar</button></div>`;
     const ej = A.items.slice(0, 3).map(i => `<li>${i.s ? `<span class="mini">🔊 ${esc(i.s.slice(0, 90))}</span><br>` : ''}${i.mp3k ? '<span class="mini">🔊 audio ligado</span><br>' : ''}<b>${esc(i.q || '(elige la mejor respuesta)')}</b><br>${i.o.map((o, j) => `<span class="${j === i.k ? 'okt' : ''}">${'ABCD'[j] || j + 1}) ${esc(o)}${j === i.k ? ' ✔' : ''}</span>`).join(' · ')}</li>`).join('');
     w.querySelector('.impcuerpo').innerHTML = `<div class="kpis impk"><div><b id="impn">${n}</b><span>preguntas</span></div><div><b>${L}</b><span>auditivas (L)</span></div><div><b>${n - L}</b><span>lectura y estructura (R)</span></div><div><b>${A.medios.length}</b><span>audios/imágenes ligados</span></div><div><b id="imprec">${A.recursos.length}</b><span>recursos</span></div></div>
     ${sk ? `<p class="aviso mini">${sk} pregunta(s) no traen respuesta correcta identificable y no se importan (no se inventan respuestas).</p>` : ''}${A.avisoL ? `<p class="mini">${esc(A.avisoL)}</p>` : ''}
     ${A.respaldos.length ? `<p class="mini"><b>${A.respaldos.length} respaldo(s) de la app</b>: se restaurarán con el procedimiento de siempre (te pedirá confirmar).</p>` : ''}${A.materiales.length ? `<p class="mini"><b>Material de práctica de la Mesa</b>: se cargará como siempre.</p>` : ''}
-    <div class="tw"><table id="imptab"><tr><th>Archivo</th><th>Tipo</th><th>Preguntas</th><th>Resultado</th></tr>${A.archivos.map(f => `<tr><td>${esc(f.nombre)}</td><td>${esc(f.tipo)}</td><td>${f.contenedor ? '—' : f.preguntas || 0}${f.preguntas ? ` <span class="mini">(L ${f.L} · R ${f.R})</span>` : ''}</td><td class="mini ${f.error ? 'badt' : ''}">${f.respaldo ? 'Respaldo · ' : f.material ? 'Material · ' : f.recurso ? 'Recurso · ' : f.medios ? 'Medio ligado · ' : ''}${esc(f.nota || (f.preguntas ? 'Preguntas listas.' : ''))}</td></tr>`).join('')}</table></div>
-    ${n ? `<h3>Ejemplos</h3><ol class="mini">${ej}</ol><label class="f">Agregar las preguntas a</label><select id="impdest"><option value="alcpt">ALCPT (práctica y simulacro ALCPT)</option><option value="alc">ALC (práctica y simulacro ALC)</option></select>` : ''}
-    <div class="row"><button class="btn" type="button" id="impok" ${n || A.recursos.length || A.respaldos.length || A.materiales.length ? '' : 'disabled'}>Importar</button><button class="btn ghost" type="button" id="impno">Cancelar</button></div>`;
+    ${acciones}
+    <div class="tw"><table id="imptab"><tr><th>Archivo</th><th>Tipo</th><th>Preguntas</th><th>Resultado</th></tr>${A.archivos.filter(f => !f.medios).map(f => `<tr><td>${esc(f.nombre)}</td><td>${esc(f.tipo)}</td><td>${f.contenedor ? '—' : f.preguntas || 0}${f.preguntas ? ` <span class="mini">(L ${f.L} · R ${f.R})</span>` : ''}</td><td class="mini ${f.error ? 'badt' : ''}">${f.respaldo ? 'Respaldo · ' : f.material ? 'Material · ' : f.recurso ? 'Recurso · ' : f.medios ? 'Medio ligado · ' : ''}${esc(f.nota || (f.preguntas ? 'Preguntas listas.' : ''))}</td></tr>`).join('')}${nLig ? `<tr><td colspan="4" class="mini">+ ${nLig} audio(s)/imagen(es) ligados a preguntas por nombre de archivo (no se listan uno por uno).</td></tr>` : ''}</table></div>
+    ${n ? `<h3>Ejemplos</h3><ol class="mini">${ej}</ol>` : ''}`;
     w.querySelector('#impno').onclick = () => { A = null; w.remove(); };
     w.querySelector('#impok').onclick = async () => {
       const d = (w.querySelector('#impdest') || {}).value || 'alcpt', B = A; A = null; w.querySelector('#impok').disabled = true;
