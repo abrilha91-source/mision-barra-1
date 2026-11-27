@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6366f1">
+<meta name="robots" content="noindex">
+<title>Manual del cadete · Misión: Obtener la Barra I</title>
+<link rel="icon" href="icon.svg">
+<style>
+:root{--v:#4f46e5;--v2:#6366f1;--oro:#f59e0b;--bg:#f4f5fb;--card:#fff;--tx:#1b1d2e;--mu:#636781;--ln:#e3e4f0;--ok:#16a34a;--bad:#dc2626;--grad:linear-gradient(135deg,#6366f1,#a855f7 55%,#ec4899);--sh:0 10px 28px -12px rgba(76,70,180,.28),0 2px 6px rgba(30,30,60,.05);--radio:18px;--safe:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--tx);font:16px/1.5 "Noto Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(1100px 560px at 100% -10%,#e9e5ff 0,transparent 60%),radial-gradient(900px 500px at -10% 0,#dff6ff 0,transparent 55%),var(--bg)}
+a{color:var(--v)}img,svg{max-width:100%}button,input{font:inherit}
+.wrap{max-width:760px;margin:0 auto;padding:12px 16px calc(88px + var(--safe))}
+.hero{background:var(--grad);color:#fff;border-radius:24px;padding:22px 20px 20px;box-shadow:var(--sh);position:relative;overflow:hidden;margin:8px 0 18px}
+.hero:after{content:"";position:absolute;right:-40px;top:-50px;width:180px;height:180px;border-radius:50%;background:#fff3}
+.hero .brand{display:flex;gap:12px;align-items:center;position:relative;z-index:1}
+.hero .brand svg{width:56px;height:56px;flex:none;filter:drop-shadow(0 4px 8px rgba(0,0,0,.18))}
+.hero h1{margin:0;font-size:1.35rem;line-height:1.2}.hero p{margin:4px 0 0;opacity:.92;font-size:.95rem}
+.badge{display:inline-block;background:#fff2;border:1px solid #fff4;border-radius:999px;padding:2px 10px;font-size:.75rem;margin-top:10px;position:relative;z-index:1}
+.toc{display:flex;gap:8px;overflow-x:auto;position:sticky;top:0;z-index:20;padding:8px 0;margin:0 -16px 16px;padding-left:16px;padding-right:16px;background:linear-gradient(#f4f5fbee,#f4f5fbee);-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.toc::-webkit-scrollbar{display:none}
+.toc a{flex:none;text-decoration:none;color:var(--tx);background:#fff;border:1px solid var(--ln);border-radius:999px;padding:8px 12px;font-size:.82rem;font-weight:650;box-shadow:0 1px 0 #fff}
+.toc a.on{background:var(--v2);color:#fff;border-color:transparent}
+.card[id]{scroll-margin-top:64px}.card{background:var(--card);border-radius:var(--radio);padding:18px 18px 16px;box-shadow:var(--sh);margin:0 0 14px;border:1px solid #fff}
+.card h2{margin:0 0 10px;font-size:1.15rem;display:flex;gap:10px;align-items:center}
+.num{flex:none;width:32px;height:32px;border-radius:10px;background:var(--grad);color:#fff;display:grid;place-items:center;font-weight:800;font-size:.9rem}
+.steps{list-style:none;margin:0;padding:0;counter-reset:p}
+.steps>li{position:relative;padding:10px 0 10px 42px;border-top:1px solid var(--ln);counter-increment:p}
+.steps>li:first-child{border-top:0}
+.steps>li:before{content:counter(p);position:absolute;left:0;top:12px;width:28px;height:28px;border-radius:50%;background:#eef0ff;color:var(--v);font-weight:800;font-size:.85rem;display:grid;place-items:center}
+.steps b{color:var(--tx)}
+.note,.ok,.warn,.clavebox{border-radius:14px;padding:12px 14px;margin:12px 0 4px;font-size:.92rem}
+.note{background:#eef2ff;color:#312e81}
+.ok{background:#ecfdf3;color:#166534}
+.warn{background:#fff7ed;color:#9a3412}
+.clavebox{background:#1b1d2e;color:#fff;border:1px solid #312e81}
+.clavebox code{display:block;font:800 1.25rem/1.3 ui-monospace,Menlo,monospace;letter-spacing:.04em;margin:6px 0 8px;word-break:break-all}
+.muted{color:var(--mu);font-size:.9rem}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.btn{appearance:none;border:0;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer;background:var(--grad);color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn.ghost{background:#fff;color:var(--v);border:1px solid #c7c9f0}
+.seg{display:flex;background:#eef0ff;border-radius:12px;padding:3px;margin:8px 0 12px}
+.seg button{flex:1;border:0;background:transparent;padding:8px;border-radius:10px;font-weight:700;color:var(--mu);cursor:pointer}
+.seg button.on{background:#fff;color:var(--v);box-shadow:var(--sh)}
+.panel{display:none}.panel.on{display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:520px){.grid{grid-template-columns:1fr}}
+.tile{border:1px solid var(--ln);border-radius:14px;padding:12px;background:#fafbff}
+.tile h3{margin:0 0 4px;font-size:.95rem}.tile p{margin:0;font-size:.82rem;color:var(--mu)}
+details{border:1px solid var(--ln);border-radius:14px;padding:0;margin:8px 0;background:#fafbff}
+summary{list-style:none;cursor:pointer;padding:12px 14px;font-weight:700;display:flex;justify-content:space-between;gap:8px;align-items:center}
+summary::-webkit-details-marker{display:none}summary:after{content:"+";color:var(--v2);font-size:1.2rem;font-weight:800}
+details[open] summary:after{content:"–"}
+details .d{padding:0 14px 14px;color:var(--mu);font-size:.92rem}
+.check{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--ln)}
+.check:first-of-type{border-top:0}
+.check input{margin-top:4px;width:18px;height:18px;accent-color:var(--v2)}
+.foot{text-align:center;color:var(--mu);font-size:.8rem;padding:8px 8px 16px}
+.aviso-priv{background:#1b1d2e;color:#fde68a;border-radius:14px;padding:12px 14px;margin:0 0 12px;font-size:.9rem}
+.prog{height:6px;background:var(--ln);border-radius:99px;overflow:hidden;margin:8px 0 0}
+.prog i{display:block;height:100%;background:#fff;width:0;border-radius:99px}
+@media print{
+  body{background:#fff}
+  .toc,.btn, .seg, .aviso-priv + .row, .noprint{display:none !important}
+  .wrap{padding:0;max-width:none}
+  .hero{box-shadow:none;break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .card{box-shadow:none;break-inside:avoid}
+  .panel{display:block !important}
+  details{break-inside:avoid}details[open] summary:after{content:""}
+  a{color:inherit;text-decoration:none}
+  @page{size:A4;margin:12mm}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset=".55" stop-color="#a855f7"/><stop offset="1" stop-color="#ec4899"/></linearGradient></defs><rect width="512" height="512" rx="110" fill="url(#lg)"/><circle cx="420" cy="90" r="120" fill="#fff" opacity=".14"/><text x="256" y="176" font-family="Noto Sans,Arial,sans-serif" font-size="92" font-weight="800" fill="#fff" text-anchor="middle">ALCPT</text><rect x="96" y="226" width="320" height="64" rx="32" fill="#fff" opacity=".9"/><text x="256" y="410" font-family="Noto Sans,Arial,sans-serif" font-size="96" font-weight="800" fill="#fff" text-anchor="middle">I</text></svg>
+    <div>
+      <h1>Manual del cadete</h1>
+      <p>Misión: Obtener la Barra I · Mesa de Inglés · Esc. Mil. Enfría.</p>
+    </div>
+  </div>
+  <span class="badge">App v2.17 · guía paso a paso</span>
+  <p style="margin:12px 0 0;position:relative;z-index:1">Con 10 a 15 minutos al día practicas el ALCPT y el ALC, bajas los bancos de la Mesa a tu celular y avanzas hacia la Barra I (60 puntos al terminar 4/o. año).</p>
+  <div class="prog noprint" aria-hidden="true"><i id="prog"></i></div>
+  <p class="muted noprint" id="progt" style="color:#fff;opacity:.9;margin:6px 0 0;font-size:.8rem"></p>
+</header>
+
+<nav class="toc noprint" aria-label="Apartados">
+  <a href="#instalar">1. Instalar</a>
+  <a href="#entrar">2. Entrar</a>
+  <a href="#bancos">3. Bancos</a>
+  <a href="#secciones">4. Secciones</a>
+  <a href="#sombra">5. Sombra</a>
+  <a href="#actualizar">6. Actualizar</a>
+  <a href="#faq">7. Dudas</a>
+</nav>
+
+<section class="card" id="instalar">
+  <h2><span class="num">1</span> Instálala en tu celular</h2>
+  <p>Ábrela primero con internet, en el navegador que se indica abajo, y agrégala a tu pantalla de inicio. Así se ve como una app y, después de la primera vez, <b>funciona sin internet</b>.</p>
+  <p class="muted">Enlace de la app:</p>
+  <p><a href="https://abrilha91-source.github.io/mision-barra-1/">https://abrilha91-source.github.io/mision-barra-1/</a></p>
+  <div class="row noprint">
+    <a class="btn" href="https://abrilha91-source.github.io/mision-barra-1/" target="_blank" rel="noopener">Abrir la aplicación</a>
+    <button class="btn ghost" type="button" data-copy="https://abrilha91-source.github.io/mision-barra-1/" data-lbl="Copiar enlace">Copiar enlace</button>
+  </div>
+  <div class="seg" role="tablist">
+    <button class="on" type="button">iPhone / iPad</button>
+    <button type="button">Android</button>
+  </div>
+  <div class="panel on">
+    <ol class="steps">
+      <li>Abre el enlace en <b>Safari</b> (la app de la brújula). En iPhone, Chrome u otro navegador no permiten bien «Agregar a inicio».</li>
+      <li>Toca el botón <b>Compartir</b> (el cuadrado con la flecha hacia arriba).</li>
+      <li>Desliza y elige <b>Agregar a inicio</b> (o «Add to Home Screen»). Si no lo ves, desliza la fila de iconos hasta el final.</li>
+      <li>Confirma el nombre «Misión: Obtener la Barra I» y toca <b>Agregar</b>.</li>
+      <li>En tu pantalla de inicio aparece el icono morado con «ALCPT I». Ábrela siempre desde ahí.</li>
+    </ol>
+  </div>
+  <div class="panel">
+    <ol class="steps">
+      <li>Abre el enlace en <b>Chrome</b>.</li>
+      <li>Toca el menú <b>⋮</b> (tres puntos, arriba a la derecha).</li>
+      <li>Elige <b>Agregar a la pantalla principal</b> o <b>Instalar aplicación</b>.</li>
+      <li>Confirma con <b>Agregar</b> o <b>Instalar</b>.</li>
+      <li>En tu pantalla de inicio aparece el icono morado con «ALCPT I». Ábrela siempre desde ahí.</li>
+    </ol>
+  </div>
+  <div class="ok">Usa <b>siempre el mismo celular y la misma app</b> (el icono de inicio). Tu práctica, tus audios y tu avance se guardan en ese dispositivo, no en la nube.</div>
+  <label class="check"><input type="checkbox" data-chk="instalar"><span>Ya la agregué a la pantalla de inicio.</span></label>
+</section>
+
+<section class="card" id="entrar">
+  <h2><span class="num">2</span> Entra por primera vez</h2>
+  
+  <p>Para entrar usas tres cosas:</p>
+  <ol>
+    <li>Tu <b>matrícula</b> (la de la lista oficial).</li>
+    <li>El <b>código de acceso de cadetes</b> que te da la Mesa de Inglés. Pídeselo a tu docente si aún no lo tienes. <b>No lo compartas</b> con personas ajenas a la escuela.</li>
+    <li>Tu <b>primer apellido</b> (y, si te lo piden, tu grupo pedagógico), para que la app confirme que eres tú.</li>
+  </ol>
+  <div class="note">Este manual público <b>no incluye el código</b>, para que no quede a la vista de cualquiera. Tu docente te lo entrega en el instructivo privado o en clase.</div>
+
+  <ol class="steps">
+    <li>Abre la app y deja seleccionado <b>Cadete</b> (viene así al inicio).</li>
+    <li>Escribe tu <b>matrícula</b> y el <b>código de acceso de cadetes</b>. Oprime <b>Continuar</b>.</li>
+    <li>Si la app reconoce tu matrícula, verás tu nombre. Confirma con <b>Sí, soy yo</b>. Si te pide tu <b>primer apellido</b>, escríbelo tal como aparece en la lista oficial (sin el segundo apellido) y continúa.</li>
+    <li>Si dice «No soy yo» o los datos no son los tuyos: revisa la matrícula. Si sigue mal, avisa a la Mesa de Inglés; no sigas con datos de otra persona.</li>
+    <li>Si tu matrícula aún no aparece en la lista, la app te pedirá tu nombre, tus dos apellidos, año, grupo pedagógico, grupo de inglés y compañía. Llénalos con cuidado: se guardan una sola vez en ese equipo.</li>
+  </ol>
+  <div class="note">Con tu matrícula y tu primer apellido (o tu grupo pedagógico) la app también confirma que puedes descargar los bancos de la Mesa. Por eso conviene que tu matrícula ya esté en el padrón.</div>
+  <label class="check"><input type="checkbox" data-chk="entrar"><span>Ya entré con mi matrícula.</span></label>
+</section>
+
+<section class="card" id="bancos">
+  <h2><span class="num">3</span> Descarga los bancos de la Mesa</h2>
+  <p>Administración publica en la app los bancos de práctica de <b>ALCPT</b> y <b>ALC</b> (preguntas y audios). La primera vez que entras <b>con internet</b>, se descargan solos a tu celular. Después los usas <b>sin conexión</b>.</p>
+  <ol class="steps">
+    <li>Entra con internet. Abre la pestaña <b>ALCPT</b> o <b>ALC</b>: verás el recuadro <b>Bancos de la Mesa</b>.</li>
+    <li>Primero bajan las <b>preguntas</b> (pocos megas, en unos segundos). Ya puedes practicar: si el audio aún no llega, se usa la voz en inglés de tu dispositivo.</li>
+    <li>Luego bajan los <b>audios e imágenes</b> en segundo plano. Verás una barra («Descargando audios: n de N paquetes…»).</li>
+    <li>Cuando termine, el recuadro dirá que los audios están <b>listos sin internet</b>.</li>
+  </ol>
+  <div class="warn">
+    <b>Consejo:</b> haz esta primera descarga por <b>Wi‑Fi</b> (en la escuela o en casa), con el celular enchufado y sin salir de la app.
+    <ul>
+      <li>Pesa alrededor de <b>110 a 120 MB</b> en tu dispositivo (un poco más mientras viaja).</li>
+      <li>En Wi‑Fi o 4G bueno tarda unos <b>5 a 8 minutos</b>; en una red lenta, <b>10 a 15 minutos</b>.</li>
+      <li>Si se corta, no pasa nada: la próxima vez que tengas internet <b>sigue donde se quedó</b>. No borres los datos de la app.</li>
+    </ul>
+  </div>
+  <p>ALCPT y ALC van <b>separados</b>: cada pestaña usa solo sus propias preguntas. El material es de práctica; no son las formas oficiales del examen.</p>
+  <label class="check"><input type="checkbox" data-chk="bancos"><span>Ya tengo los bancos listos en este celular.</span></label>
+</section>
+
+<section class="card" id="secciones">
+  <h2><span class="num">4</span> Cómo está organizada la app</h2>
+  <p>Abajo tienes las pestañas. Una rutina de 10 a 15 minutos rinde más que estudiar horas la noche anterior.</p>
+  <div class="grid">
+    <div class="tile"><h3>☀ Hoy</h3><p>Tu misión del día, racha, puntaje estimado, tarjetas y atajos. El primer día oprime <b>Descubre tu nivel</b> (12 preguntas, unos 8 min).</p></div>
+    <div class="tile"><h3>✎ Practicar</h3><p>Errores, misión mixta, listening rápido, tu tema más débil y práctica por temas. Incluye <b>Completa la palabra</b>.</p></div>
+    <div class="tile"><h3>🎧 Listening</h3><p>Ocho juegos para el oído (dictado, diálogos, números, verbos…). El listening vale la mitad del ALCPT. Usa audífonos.</p></div>
+    <div class="tile"><h3>❖ Vocab</h3><p>Flash cards con repetición espaciada: temas ALCPT, libros ALC y verbos. Repasa primero lo que toca hoy.</p></div>
+    <div class="tile"><h3>⏱ Simulacro</h3><p>Ejercicio corto (20 preguntas, 15 min) o completo (100 preguntas, 70 min). Es práctica, no un resultado oficial.</p></div>
+    <div class="tile"><h3>◎ ALCPT</h3><p>Práctica y simulacro con el formato del ALCPT (comprensión auditiva, gramática, vocabulario y lectura) y los bancos de la Mesa.</p></div>
+    <div class="tile"><h3>▤ ALC</h3><p>Práctica y simulacro del material ALC (por libro). No se mezcla con las preguntas ALCPT.</p></div>
+    <div class="tile"><h3>⚑ Mi sombra</h3><p>Tu pareja del Programa Sombra y, si quieres, una pareja de estudio y la competencia semanal.</p></div>
+  </div>
+  <p class="muted" style="margin-top:10px">Toca tu foto o tus iniciales (arriba a la izquierda) para abrir <b>Mi perfil</b>. Ahí también puedes consultar tus <b>calificaciones oficiales</b> (con tu matrícula y tu primer apellido).</p>
+  <div class="note"><b>Metas de egreso:</b> 1/er. año 42 · 2/o. 48 · 3/er. 54 · 4/o. 60 (Barra I). El puntaje estimado de la app no es un resultado oficial.</div>
+  <p class="muted">Si aparece el recuadro naranja de envío, genera tu <b>código de avance</b> (empieza con «MB1.») y envíaselo a tu coordinadora. Ese código no es el de acceso.</p>
+</section>
+
+<section class="card" id="sombra">
+  <h2><span class="num">5</span> Programa Sombra</h2>
+  <p>Es la tutoría entre pares de la Mesa de Inglés, a partir del ALCPT de noviembre de 2026, sin importar el año.</p>
+  <ul>
+    <li><b>Senior shadow:</b> obtuvo 70 o más.</li>
+    <li><b>Junior shadow:</b> obtuvo menos de 70.</li>
+  </ul>
+  <p>A cada senior se le asignan juniors. El senior ve a sus juniors en <b>Mi sombra</b>; el junior ve quién es su senior.</p>
+  <p>La dinámica es breve: <b>dos sesiones de 20 minutos por semana</b> (si no se puede, al menos una de 25 a 30 min). En cada sesión:</p>
+  <ol>
+    <li>4 min de vocabulario (flash cards).</li>
+    <li>12 min de eje (semanas impares: Listening Lab, 10 audios; semanas pares: Completa la palabra y gramática o lectura).</li>
+    <li>4 min para anotar 3 errores y registrar la sesión en Mi sombra.</li>
+  </ol>
+  <p class="muted">Cada 3 semanas, un simulacro corto de 20 preguntas (práctica). El senior cuyos juniors sumen más avance en el próximo ALCPT oficial (respecto de noviembre de 2026) obtendrá un beneficio.</p>
+</section>
+
+<section class="card" id="actualizar">
+  <h2><span class="num">6</span> Buscar actualización</h2>
+  <p>Si Administración publica una versión nueva de los bancos, la app la busca sola cuando tienes internet (más o menos cada 6 horas). Solo se baja <b>lo que cambió</b>.</p>
+  <ol class="steps">
+    <li>Conéctate a internet y abre la pestaña <b>ALCPT</b> o <b>ALC</b>.</li>
+    <li>En el recuadro <b>Bancos de la Mesa</b>, oprime <b>Buscar actualización</b>.</li>
+    <li>Si hay una versión nueva, bajarán las preguntas de inmediato y los audios nuevos en segundo plano.</li>
+  </ol>
+  <div class="note">Si Administración retira los bancos, la próxima vez que te conectes desaparecerán de tu equipo. Tu práctica y tu avance se quedan.</div>
+  <label class="check"><input type="checkbox" data-chk="actualizar"><span>Ya sé dónde está «Buscar actualización».</span></label>
+</section>
+
+<section class="card" id="faq">
+  <h2><span class="num">7</span> Dudas y problemas</h2>
+  <details><summary>Dice «Código de acceso incorrecto»</summary><div class="d">Comprueba que elegiste <b>Cadete</b> (no Administración ni Directora). Escribe el código con el guion, sin espacios de más. No importa si usas mayúsculas o minúsculas. Si un compañero cambió los códigos en <b>ese</b> celular, en ese aparato puede ya no valer el de origen: pide ayuda a la Mesa o entra desde tu propio equipo.</div></details>
+  <details><summary>No aparece mi matrícula o dice que no soy yo</summary><div class="d">Revisa que la escribiste bien. Si está en el padrón, te pedirá tu <b>primer apellido</b>. Si los datos no son los tuyos, avisa a la Mesa de Inglés. Si eres integrante nuevo y aún no estás en la lista, llena tus datos cuando la app te los pida y avisa para que te den de alta en el padrón (hace falta para bajar los bancos).</div></details>
+  <details><summary>No se descargan los bancos</summary><div class="d">Necesitas internet, estar en la pestaña Cadete (no el usuario piloto) y que tu matrícula esté en el padrón, con el apellido o el grupo pedagógico correctos. Si dice que no pudo comprobar tu matrícula, avisa a Administración. Si dice que esperes unos minutos, hubo varios intentos: prueba más tarde. Si dice que Administración aún no publica bancos, aún no los han publicado o los retiraron.</div></details>
+  <details><summary>Se cortó la descarga de audios</summary><div class="d">Vuelve a entrar con internet; continúa sola. Oprime <b>Buscar actualización</b> si no arranca. No borres los datos del sitio: perderías lo ya bajado y tu práctica.</div></details>
+  <details><summary>Mi práctica aparece en cero</summary><div class="d">Entraste desde otro celular, otro navegador o se borraron los datos. Usa el icono de la pantalla de inicio del mismo equipo de siempre.</div></details>
+  <details><summary>No se oye el audio</summary><div class="d">Sube el volumen y quita el silencio. Usa audífonos. Si el banco aún se está bajando, se usa la voz del dispositivo: en iPhone instala una voz en inglés en Ajustes › Accesibilidad › Contenido hablado; en Android, en Ajustes › Texto a voz. Cuando el recuadro diga «audios listos sin internet», se oirá la grabación original.</div></details>
+  <details><summary>En iPhone no me deja agregarla al inicio</summary><div class="d">Ábrela en <b>Safari</b>, no en Chrome ni en Instagram o WhatsApp (si te llegó el enlace por ahí, tócalo y elige «Abrir en Safari»). Luego Compartir › Agregar a inicio.</div></details>
+  <details><summary>¿Puedo usarla sin internet?</summary><div class="d">Sí, después de abrirla una vez con internet e instalarla, y de descargar los bancos. Sin conexión practicas con lo que ya esté en tu celular. Para buscar una actualización de los bancos sí hace falta internet.</div></details>
+  <details><summary>¿Qué códigos no debo pedir ni usar?</summary><div class="d">Solo te corresponde el <b>código de acceso de cadetes</b>, tu matrícula y tu apellido. Los códigos de Administración y de la Directora, y la clave de lectura de la Hoja, no son para cadetes. El código de una evaluación oficial te lo da el aplicador <b>ese día</b> y solo sirve ese día.</div></details>
+</section>
+
+<p class="foot">Mesa de Inglés · Escuela Militar de Enfermería · Misión: Obtener la Barra I · v2.17<br>Tu práctica se guarda solo en este dispositivo. Este material es de práctica; no sustituye un resultado oficial.</p>
+</div>
+<script>
+(function(){
+  const toc=[...document.querySelectorAll('.toc a')];
+  const secs=toc.map(a=>document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  const hl=()=>{let on=toc[0];const y=innerHeight*0.28;for(const s of secs){if(s.getBoundingClientRect().top<=y)on=toc[secs.indexOf(s)];}toc.forEach(a=>a.classList.toggle('on',a===on));};
+  addEventListener('scroll',hl,{passive:true});hl();
+  document.querySelectorAll('.seg').forEach(seg=>{
+    const pans=seg.parentElement.querySelectorAll(':scope > .panel');
+    seg.querySelectorAll('button').forEach((b,i)=>b.onclick=()=>{seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));pans.forEach((p,j)=>p.classList.toggle('on',j===i));});
+  });
+  const KEY='mb1_manual_v217';
+  const saved=JSON.parse(localStorage.getItem(KEY)||'{}');
+  document.querySelectorAll('[data-chk]').forEach(c=>{
+    c.checked=!!saved[c.dataset.chk];
+    c.onchange=()=>{saved[c.dataset.chk]=c.checked;localStorage.setItem(KEY,JSON.stringify(saved));barra();};
+  });
+  function barra(){const all=[...document.querySelectorAll('[data-chk]')];const n=all.filter(x=>x.checked).length;const el=document.getElementById('prog');if(el){el.style.width=(all.length?Math.round(100*n/all.length):0)+'%';const t=document.getElementById('progt');if(t)t.textContent=n+' de '+all.length+' listos';}}
+  barra();
+  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{try{await navigator.clipboard.writeText(b.dataset.copy);b.textContent='Copiado';setTimeout(()=>b.textContent=b.dataset.lbl||'Copiar',1600);}catch(e){}});
+})();
+</script>
+</body>
+</html>

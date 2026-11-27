@@ -3,7 +3,11 @@ Aplicación de práctica de inglés de la Mesa de Inglés (Esc. Mil. Enfría.). 
 
 Incluye práctica diaria, laboratorio de listening con juegos y niveles, ejercicios para completar la palabra que falta, flash cards y ejercicios de vocabulario y verbos con repetición espaciada (ALCPT y ALC), perfil personalizable, técnicas de estudio, simulacros con tiempo, competencia entre compañeros y seguimiento de avance para la coordinación.
 
-Versión 2.17.
+Versión 2.17.1.
+
+## Novedades 2.17.1
+
+- **Manual del cadete**: guía interactiva en [manual.html](manual.html) (instalación en iPhone y Android, primer ingreso, descarga de los bancos de la Mesa, secciones, Programa Sombra, actualizaciones y dudas). El código de acceso no va en este manual público; lo entrega la Mesa.
 
 ## Novedades 2.17
 

@@ -1,6 +1,6 @@
 'use strict';
 /* Misión: Obtener la Barra I — versión PWA (sin servidor). Datos solo en este dispositivo. */
-const VER = '2.17';
+const VER = '2.17.1';
 // Firma: en el servidor de intranet la entrega /config.js (clave aleatoria por instalación, solo en la red local).
 // En la versión pública no hay clave secreta: es una suma de verificación pública (detecta errores de copia, no falsificación).
 const SECRET = window.MB1_FIRMA || 'MB1-PUBLICO-v2.3.1';
@@ -228,6 +228,7 @@ function vLogin() {
   <label>Matrícula<input id="lmat" autocapitalize="characters" placeholder="Ej. A-12345678"></label>
   <label>Código de acceso<input id="lcod" type="password" autocapitalize="characters" onkeydown="if(event.key==='Enter')entrar()"></label>
   <button class="btn big" onclick="entrar()">Entrar</button>`}
+  <p class="mini" style="text-align:center;margin:0 0 10px"><a href="manual.html" target="_blank" rel="noopener">Manual del cadete: instálala, entra y descarga los bancos</a></p>
   <div class="row"><button class="btn ghost" style="flex:1" onclick="ayuda()">Instructivos</button><button class="btn ghost" style="flex:1" onclick="entrarPiloto()">Usuario piloto</button></div>
   <p class="mini">Tus datos se guardan solo en este dispositivo. Funciona sin internet una vez abierta.</p></div>`;
 }
@@ -805,7 +806,7 @@ const AYUDA = {
 };
 let ayudaK = 'cadete';
 function ayuda(k) { if (k) ayudaK = k; let el = $('#ayuda'); if (!el) { el = document.createElement('div'); el.id = 'ayuda'; document.body.appendChild(el); }
-  el.innerHTML = `<div class="ayc"><div class="gh"><b>Instructivos</b><button onclick="$('#ayuda').remove()">✕</button></div><div class="seg">${Object.entries(AYUDA).map(([k, v]) => `<button class="${ayudaK === k ? 'on' : ''}" onclick="ayuda('${k}')">${v[0]}</button>`).join('')}</div><div class="ayb">${AYUDA[ayudaK][1]}</div><p class="mini">El instructivo de administración se entrega por separado a la Mesa de Inglés.</p></div>`; }
+  el.innerHTML = `<div class="ayc"><div class="gh"><b>Instructivos</b><button onclick="$('#ayuda').remove()">✕</button></div><p class="mini" style="margin:0 0 8px"><a href="manual.html" target="_blank" rel="noopener">Abrir el manual completo del cadete (instalación, bancos y Programa Sombra)</a></p><div class="seg">${Object.entries(AYUDA).map(([k, v]) => `<button class="${ayudaK === k ? 'on' : ''}" onclick="ayuda('${k}')">${v[0]}</button>`).join('')}</div><div class="ayb">${AYUDA[ayudaK][1]}</div><p class="mini">El instructivo de administración se entrega por separado a la Mesa de Inglés.</p></div>`; }
 
 /* ---------- Actividad (requiere servidor) ---------- */
 let af = { desde: '', hasta: '', anio: '', gp: '', txt: '', vista: 'act' };
