@@ -196,3 +196,5 @@ th{color:var(--v)}[data-tema=oscuro] th{color:var(--v2)}
 #impprev .impk{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:8px 0}
 #impprev table td,#impprev table th{vertical-align:top}
 .impmed{margin:8px 0}.impmed img,.impmed video{max-width:100%;max-height:50vh;border-radius:10px}
+
+#pubadm .pbar{height:8px;background:var(--ln);border-radius:99px;overflow:hidden;margin:6px 0 10px}#pubadm .pbar i{display:block;height:100%;background:var(--v2)}

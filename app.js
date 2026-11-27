@@ -1,6 +1,6 @@
 'use strict';
 /* Misión: Obtener la Barra I — versión PWA (sin servidor). Datos solo en este dispositivo. */
-const VER = '2.16.1';
+const VER = '2.17';
 // Firma: en el servidor de intranet la entrega /config.js (clave aleatoria por instalación, solo en la red local).
 // En la versión pública no hay clave secreta: es una suma de verificación pública (detecta errores de copia, no falsificación).
 const SECRET = window.MB1_FIRMA || 'MB1-PUBLICO-v2.3.1';
@@ -719,6 +719,7 @@ function mAjustes() { return `${cardPadron()}<section class="card"><h3>Cambio de
   <p class="mini" id="matest">${window.ALCMOD && ALCMOD.tieneMaterial && ALCMOD.tieneMaterial() ? 'Material listo en este dispositivo.' : 'Aún no hay material de práctica ALC en este dispositivo.'}</p>
   <div class="row"><label class="btn">Cargar material (.json)<input type="file" hidden accept=".json,application/json" onchange="cargarMaterialALC(this)"></label></div></section>
   ${window.IMPORTA ? IMPORTA.card() : ''}
+  ${window.BANCOS ? BANCOS.cardAdmin() : ''}
   <section class="card"><h3>Respaldo</h3><p class="mini">Guarda el avance, el padrón y los ajustes en un archivo JSON. Úsalo para pasar los datos a otro equipo o a la computadora de la Mesa.</p><div class="row"><button class="btn" onclick="respaldo()">Descargar respaldo</button><label class="btn ghost">Restaurar respaldo<input type="file" hidden accept=".json,application/json" onchange="restaurar(this)"></label></div></section>
   ${window.USO && esAdmin() ? USO.cardAjustes() : ''}
   <section class="card"><h3>Este dispositivo</h3><p class="mini">Versión ${VER} · ${navigator.onLine ? 'en línea' : 'sin internet'} · ${'serviceWorker' in navigator && navigator.serviceWorker.controller ? 'lista para usarse sin internet ✔' : 'ábrela una vez con internet para usarla sin conexión'} · ${SRV ? '<b class="okt">Servidor de intranet conectado</b>' : SHEET ? '<b class="okt">Hoja de actividad conectada</b>' : 'sin servidor'} · equipo ${EQUIPO}${(S.cola || []).length ? ' · ' + S.cola.length + ' envío(s) pendientes' : ''}</p></section>`; }
