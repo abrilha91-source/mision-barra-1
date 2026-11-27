@@ -3,7 +3,11 @@ Aplicación de práctica de inglés de la Mesa de Inglés (Esc. Mil. Enfría.). 
 
 Incluye práctica diaria, laboratorio de listening con juegos y niveles, ejercicios para completar la palabra que falta, flash cards y ejercicios de vocabulario y verbos con repetición espaciada (ALCPT y ALC), perfil personalizable, técnicas de estudio, simulacros con tiempo, competencia entre compañeros y seguimiento de avance para la coordinación.
 
-Versión 2.17.1.
+Versión 2.17.2.
+
+## Novedades 2.17.2
+
+- **Audio en Listening (oraciones y el resto):** al tocar Escuchar o Lento, el audio empieza en ese mismo toque (antes había una pausa de 1,5 s que, en iPad y en la app instalada, podía dejar el audio en silencio). El botón muestra «Reproduciendo…». Si el dispositivo no puede hablar, aparece un aviso para revisar el volumen, el silencio del iPad o la voz en inglés. En Hoy puedes usar «Probar voz».
 
 ## Novedades 2.17.1
 

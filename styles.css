@@ -198,3 +198,6 @@ th{color:var(--v)}[data-tema=oscuro] th{color:var(--v2)}
 .impmed{margin:8px 0}.impmed img,.impmed video{max-width:100%;max-height:50vh;border-radius:10px}
 
 #pubadm .pbar{height:8px;background:var(--ln);border-radius:99px;overflow:hidden;margin:6px 0 10px}#pubadm .pbar i{display:block;height:100%;background:var(--v2)}
+
+.audio.hablando .btn.big{animation:audpulso 1s ease-in-out infinite}
+@keyframes audpulso{50%{filter:brightness(1.12);transform:scale(1.01)}}

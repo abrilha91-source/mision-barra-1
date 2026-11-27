@@ -1,6 +1,6 @@
 'use strict';
 /* Misión: Obtener la Barra I — versión PWA (sin servidor). Datos solo en este dispositivo. */
-const VER = '2.17.1';
+const VER = '2.17.2';
 // Firma: en el servidor de intranet la entrega /config.js (clave aleatoria por instalación, solo en la red local).
 // En la versión pública no hay clave secreta: es una suma de verificación pública (detecta errores de copia, no falsificación).
 const SECRET = window.MB1_FIRMA || 'MB1-PUBLICO-v2.3.1';
@@ -345,7 +345,7 @@ function vHoy(p) {
   <section class="row2"><button class="tile" onclick="iniciarTarjetas()"><b>Tarjetas</b><span>${tarjetasPendientes(p).length} por repasar</span></button><button class="tile" onclick="tab='sombra';render()"><b>Competencia</b><span>${ranking.length > 1 ? ranking.map((r, i) => `${i + 1}. ${esc(r.n.split(' ')[0])} ${r.w}`).join(' · ') : 'Esta semana: ' + w[1] + ' aciertos'}</span></button></section>
   <section class="card"><h3>Insignias</h3><div class="badges">${INSIGNIAS.map(([k, l]) => `<span class="${p.ins[k] ? 'on' : ''}">${p.ins[k] ? '🏅' : '○'} ${l}</span>`).join('')}</div></section>
   <section class="card" id="audio-cfg"><h3>Audio</h3>
-  <p class="mini">Las preguntas de comprensión auditiva usan grabaciones. Si no hay grabación, se lee con la voz en inglés de este dispositivo. Cambiar la voz solo afecta esas lecturas, no las grabaciones. Hay una pausa breve al inicio para que se oiga completa la pregunta.</p>
+  <p class="mini">Las preguntas de comprensión auditiva usan grabaciones. Si no hay grabación, se lee con la voz en inglés de este dispositivo. Si no se oye nada, revisa el volumen y, en iPad, el interruptor de silencio; luego oprime <b>Probar voz</b>. Cambiar la voz solo afecta las lecturas, no las grabaciones.</p>
   <label>Voz en inglés<select id="vozsel">${window.MB1AUD?MB1AUD.opcionesVoz():'<option value="">Voz del dispositivo</option>'}</select></label>
   <label>Velocidad<select id="ratesel">${[[.8,'Lenta'],[.9,'Normal'],[1,'Rápida']].map(([v,l])=>`<option value="${v}" ${window.MB1AUD&&MB1AUD.rateGuardada(.9)===v?'selected':''}>${l}</option>`).join('')}</select></label>
   <button class="btn ghost" type="button" id="probarvoz">Probar voz</button></section>
@@ -454,7 +454,7 @@ function pintarQ() {
   ${Q.fb && sel != null ? `<div class="pista"><b>${sel === 0 ? '✔ Correcto.' : '✘ Respuesta correcta: ' + esc(it.o[0])}</b>${it.lis ? `<br>Audio: “${esc(it.au)}”` : ''}<br>${PISTA[it.t] || ''}</div>` : ''}</main>
   <footer><button class="btn ghost" onclick="mover(-1)" ${Q.i ? '' : 'disabled'}>Anterior</button>${Q.i < n - 1 ? `<button class="btn" onclick="mover(1)">Siguiente</button>` : `<button class="btn" id="entregar" onclick="if(confirm('¿Entregar?'))terminar()">Entregar</button>`}</footer></div>`;
   if (Q.tiempo) tick();
-  if (it.lis && pl === 0 && sel == null && !Q.oficial) play();
+  if (it.lis && pl === 0 && sel == null && !Q.oficial && window.MB1AUD && MB1AUD.listo()) play();
 }
 function play() { const pl = Q.plays[Q.i] || 0; if (Q.oficial && pl >= 2) return; Q.plays[Q.i] = pl + 1; hablar(Q.items[Q.i].it.au); if (Q.oficial) pintarQ(); }
 function responder(o) { if (Q.fb && Q.resp[Q.i] != null) return; Q.resp[Q.i] = o; if (Q.fb) { registrar(P(), Q.items[Q.i].it, o === 0); save(); } pintarQ(); if (Q.fb && window.FX) { if (o === 0) FX.ok(); else FX.no(); } if (!Q.fb && Q.i < Q.items.length - 1) setTimeout(() => { if (Q) mover(1); }, 220); }
@@ -775,7 +775,7 @@ function finPiloto() { if (esPiloto() || REAL) salirSandbox(); cerrarGuion(); lo
 const AYUDA = {
   cadete: ['Cadete', `<h3>Entrada</h3><ol><li>Abre el enlace de la aplicación que comparte tu docente.</li><li>Elige <b>Cadete</b>, escribe tu <b>matrícula</b> y el código de acceso que te dio la Mesa de Inglés. Oprime <b>Continuar</b>.</li><li>La app busca tus datos con tu matrícula: si ya tienes perfil en ese equipo entras directo; si apareces en la lista, confirma «Sí, soy yo». Si te pide tu primer apellido, escríbelo para buscarte en la lista oficial.</li><li>Si no apareces y tu equipo no exige que estés en la lista, escribe tu nombre y tus dos apellidos completos, año y grupos. Se guardan una sola vez con tu matrícula.</li></ol><p class="mini">Usa siempre el mismo equipo y navegador: tu práctica se guarda ahí. Instálala: Android › menú ⋮ › Agregar a pantalla principal; iPhone › Compartir › Agregar a inicio. Después funciona sin internet.</p>
   <h3>Primer día</h3><p>En Hoy oprime <b>Descubre tu nivel</b> (12 preguntas, unos 8 min, sin calificación). Con 20 respuestas aparece tu puntaje estimado. Metas de egreso: 1/er. año 42 · 2/o. 48 · 3/er. 54 · 4/o. 60 (Barra I). El estimado no es un resultado oficial.</p>
-  <h3>Uso diario (10 a 15 min)</h3><ol><li>Hoy › <b>Misión de hoy</b>: 8 preguntas con tu tema más débil y tus errores.</li><li>Hoy › <b>Tarjetas</b>: unos 5 minutos de repaso.</li><li>Practicar › <b>Listening rápido</b>: 5 audios. El listening vale la mitad del simulacro.</li><li><b>Vocab</b>: tus flash cards pendientes del día (unos 5 minutos).</li></ol><p class="mini">Escuchar reproduce la grabación de la pregunta (si no hay grabación, la voz en inglés de este dispositivo). Hay una pausa breve al inicio. Lento lo repite despacio. En Hoy puedes cambiar la voz de las lecturas (no cambia las grabaciones). Usa audífonos.</p>
+  <h3>Uso diario (10 a 15 min)</h3><ol><li>Hoy › <b>Misión de hoy</b>: 8 preguntas con tu tema más débil y tus errores.</li><li>Hoy › <b>Tarjetas</b>: unos 5 minutos de repaso.</li><li>Practicar › <b>Listening rápido</b>: 5 audios. El listening vale la mitad del simulacro.</li><li><b>Vocab</b>: tus flash cards pendientes del día (unos 5 minutos).</li></ol><p class="mini">Escuchar reproduce la grabación de la pregunta (si no hay grabación, la voz en inglés de este dispositivo). Lento lo repite despacio. En Hoy puedes cambiar la voz de las lecturas (no cambia las grabaciones). Usa audífonos.</p>
   <h3>Simulacro</h3><ol><li>En <b>Simulacro</b> puedes hacer un ejercicio corto (20 preguntas, 15 min) o un simulacro completo (100 preguntas, 70 min).</li><li>Al terminar ves tu porcentaje y puedes revisar. Es práctica: no es un resultado oficial.</li></ol>
   <h3>Envío de tu avance</h3><p>La coordinación no ve tu práctica hasta que envías tu código de avance (empieza con “MB1.”). Si aparece el recuadro naranja “Tu coordinadora todavía no ve tu práctica”, oprime <b>Generar mi código de avance</b> › Copiar o WhatsApp y envíalo completo. El más reciente reemplaza al anterior.</p>
   <h3>Programa Sombra</h3><p>Es un programa de tutoría entre pares de la Mesa de Inglés, a partir del último ALCPT (noviembre de 2026), sin importar el año. <b>Senior shadow</b> es quien obtuvo <b>70 o más</b>; <b>Junior shadow</b>, quien obtuvo <b>menos de 70</b>. A cada senior se le asignan juniors en cantidades lo más iguales posible y al menos uno de los de menor puntaje. El senior ve a sus juniors en <b>Mi sombra</b>; el junior ve quién es su senior.</p>
