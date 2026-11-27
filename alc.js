@@ -46,6 +46,7 @@ function render(){if(!V||!document.body.contains(V))return;nav();let h=VIEW;
  if(EX&&h!=='examen'){if(!confirm('¿Salir del examen en curso? Se perderá.')){VIEW='examen';nav();return}EX=null;if(AUD)AUD.pause();if(PISTA){PISTA.el.pause();PISTA=null}speechSynthesis&&speechSynthesis.cancel()}
  if(['alc','alcpt','final','calif','banco'].includes(h)){VIEW=h==='alc'||h==='alcpt'?'practica':'inicio';nav();h=VIEW}(PT?{inicio:ptInicio,practica:ptPractica,simulacro:ptSimulacro,resultados:vRes,examen:vExamen}[h]||ptInicio:{inicio:vInicio,practica:vPractica,simulacro:vSimulacro,alcpt:vPractica,alc:vPractica,resultados:vRes,examen:vExamen}[h]||vInicio)();links();const top=ROOT.getBoundingClientRect().top+scrollY-70;if(scrollY>top)window.scrollTo(0,Math.max(0,top))}
 const sinBanco=()=>{const adm=ADM()&&!SOLO_LEC();return `<div class="card"><h1>Material de práctica</h1><p class="muted">${adm?'Esta sección se publica vacía. Carga aquí el archivo que entrega la Mesa de Inglés. Se guarda solo en este dispositivo.':'El material de práctica aún no está en este dispositivo. Pídele a tu docente que lo cargue.'}</p>${adm?`<label class="btn big">Cargar material (.json)<input type="file" class="imp" accept=".json,application/json" hidden></label>`:''}</div>`};
+const sinAlc=()=>BANK&&!nAlc()?`<div class="card"><h1>Práctica ALC</h1><p class="muted">Aún no hay reactivos ALC en este dispositivo. ${ADM()&&!SOLO_LEC()?'Importa un banco con destino ALC en Ajustes › Bancos de preguntas.':'Pídele a tu docente que los cargue.'} Los reactivos ALCPT están en la pestaña ALCPT.</p></div>`:sinBanco();
 function bindImp(){document.querySelectorAll('input.imp').forEach(i=>i.onchange=importar)}
 function importar(e){const f=e&&e.target&&e.target.files?e.target.files[0]:e;if(!f||!f.name)return;return importarMaterial(f)}
 function importarMaterial(f){if(SOLO_LEC()||!ADM()){toast('Solo Administración puede cargar el material de práctica.');return Promise.resolve(false)}
@@ -83,9 +84,11 @@ function hablar(txt,fin){if(!('speechSynthesis'in window)){alert('Este navegador
 function tablaCursos(){const E=ESQ();return `<div class="tw"><table><tr><th>Curso</th><th>Libros ALC</th>${parN()===3?'<th>P1</th><th>P2</th><th>P3</th>':'<th>Parcial 1</th><th>Parcial 2</th>'}<th>Puntaje de referencia</th></tr>${cursos().map(c=>`<tr><td>${esc(c.nombre)}${c.nota==='inferido'?' <span class="mini">(inferido)</span>':''}</td><td>${c.libros.join(', ')}</td>${Array.from({length:parN()},(_,i)=>`<td>Book ${c.libros[i]??'—'}</td>`).join('')}<td>${esc(c.ref||'—')}</td></tr>`).join('')}</table></div><p class="mini">${esc(E.fuente||'')}</p>`}
 function selEsq(){const es=BANK.esquemas||{};if(Object.keys(es).length<2)return `<p class="mini">${esc((es[esqId()]||{}).nombre||'')}</p>`;return `<label class="f">Esquema de la materia</label><select id="esq">${Object.entries(es).map(([k,e])=>`<option value="${k}" ${k===esqId()?'selected':''}>${esc(e.nombre)}</option>`).join('')}</select>`}
 function bindEsq(fn){const s=$('#esq');if(s)s.onchange=()=>{SS('mb1_alc_esq',s.value);F={};fn()}}
-function armarLibre(n,sec,mezcla){let p=mezcla?(BANK.alcpt||[]).concat(BANK.alc||[]):(BANK.alcpt||[]);p=p.filter(it=>!sec||it.sec===sec);if(!p.length)p=(BANK.alc||[]).filter(it=>!sec||it.sec===sec);if(!p.length)return[];const Lp=shuffle(p.filter(i=>i.sec==='L')),Rp=shuffle(p.filter(i=>i.sec==='R'));n=Math.min(+n||p.length,p.length);let nl=sec==='L'?n:sec==='R'?0:Math.min(Lp.length,Math.round(n/2));if(n-nl>Rp.length)nl=n-Rp.length;return Lp.slice(0,nl).concat(Rp.slice(0,n-nl))}
-function iniciarLibre(modo){if(!BANK){toast('El material de práctica aún no está en este dispositivo.');return}const sec=($('#sec')&&$('#sec').value)||'';const n=modo==='practica'?(+($('#n')&&$('#n').value)||20):100;const its=armarLibre(n,sec,modo==='practica');if(!its.length){toast('El material de práctica aún no está en este dispositivo.');return}const nom=(($('#nom')&&$('#nom').value.trim())||nomDef());if($('#nom'))localStorage.setItem('mb1_alc_nom',nom);EX={fuente:'alcpt',c:{alcance:'libre'},modo:modo==='practica'?'practica':'simulacro',nom,its,i:0,r:its.map(()=>null),plays:its.map(()=>0),ini:Date.now()};go('examen')}
-function vInicio(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}
+/* v2.16: ALC usa solo reactivos ALC (nunca ALCPT) */
+const nAlc=()=>BANK&&Array.isArray(BANK.alc)?BANK.alc.filter(i=>i&&Array.isArray(i.o)&&i.k!=null).length:0;
+function armarLibre(n,sec,mezcla){let p=(BANK.alc||[]).filter(i=>i&&Array.isArray(i.o)&&i.k!=null);p=p.filter(it=>!sec||it.sec===sec);if(!p.length)return[];const Lp=shuffle(p.filter(i=>i.sec==='L')),Rp=shuffle(p.filter(i=>i.sec==='R'));n=Math.min(+n||p.length,p.length);let nl=sec==='L'?n:sec==='R'?0:Math.min(Lp.length,Math.round(n/2));if(n-nl>Rp.length)nl=n-Rp.length;return Lp.slice(0,nl).concat(Rp.slice(0,n-nl))}
+function iniciarLibre(modo){if(!BANK||!nAlc()){toast('Aún no hay reactivos ALC en este dispositivo.');return}const sec=($('#sec')&&$('#sec').value)||'';const n=modo==='practica'?(+($('#n')&&$('#n').value)||20):100;const its=armarLibre(n,sec,modo==='practica');if(!its.length){toast('No hay reactivos ALC con ese filtro.');return}const nom=(($('#nom')&&$('#nom').value.trim())||nomDef());if($('#nom'))localStorage.setItem('mb1_alc_nom',nom);EX={fuente:'alcpt',c:{alcance:'libre'},modo:modo==='practica'?'practica':'simulacro',nom,its,i:0,r:its.map(()=>null),plays:its.map(()=>0),ini:Date.now()};go('examen')}
+function vInicio(){if(!BANK||!nAlc()){V.innerHTML=sinAlc();bindImp();return}
  const mm=matDef(),r=RES().filter(x=>ADM()||!mm||x.m===mm).slice(-5).reverse();
  V.innerHTML=`<div class="card"><h1>Práctica ALC</h1><p class="muted">Practica o presenta un simulacro. Es práctica: no es un resultado que cuente.</p>
  <div class="row"><a class="btn big" href="#practica">Práctica</a><a class="btn big" href="#simulacro">Simulacro</a></div></div>
@@ -94,14 +97,14 @@ function vInicio(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}
  <label class="f">Velocidad</label><select id="ratesel">${[[.8,'Lenta'],[.9,'Normal'],[1,'Rápida']].map(([v,l])=>`<option value="${v}" ${window.MB1AUD&&MB1AUD.rateGuardada(.9)===v?'selected':''}>${l}</option>`).join('')}</select>
  <button class="btn ghost" type="button" id="probarvoz">Probar voz</button></div>
  <div class="card"><h2>Últimos resultados</h2>${r.length?tablaRes(r):'<p class="muted">Aún no hay resultados en este dispositivo.</p>'}</div>`;if(window.MB1AUD)MB1AUD.bindAudioUI(V)}
-function vPractica(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}
+function vPractica(){if(!BANK||!nAlc()){V.innerHTML=sinAlc();bindImp();return}
  V.innerHTML=`<div class="card"><h1>Práctica</h1><p class="muted">Respondes y ves de inmediato si acertaste.</p>
  <div class="row"><div><label class="f">Sección</label><select id="sec"><option value="">Ambas</option><option value="L">Comprensión auditiva</option><option value="R">Lectura y estructura</option></select></div>
  <div><label class="f">Número de preguntas</label><input type="number" id="n" min="5" max="50" value="20"></div></div>
  <label class="f">Nombre (opcional, para tu registro)</label><input type="text" id="nom" value="${esc(nomDef())}">
  <button class="btn big" id="go">Comenzar práctica</button></div>`;
  $('#go').onclick=()=>iniciarLibre('practica')}
-function vSimulacro(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}
+function vSimulacro(){if(!BANK||!nAlc()){V.innerHTML=sinAlc();bindImp();return}
  V.innerHTML=`<div class="card"><h1>Simulacro</h1><p class="muted">Preguntas de comprensión auditiva y de lectura, con revisión al final. Es práctica: no es un resultado que cuente.</p>
  <label class="f">Sección</label><select id="sec"><option value="">Completo</option><option value="L">Solo comprensión auditiva</option><option value="R">Solo lectura y estructura</option></select>
  <label class="f">Nombre (opcional, para tu registro)</label><input type="text" id="nom" value="${esc(nomDef())}">
@@ -414,7 +417,7 @@ function recargar(){CARGA=null;return cargar().then(()=>{if(V&&document.body.con
 let SESK=null;function mount(el){CARGA=null;const sk=(()=>{const x=SES();return x?x.perfil+'|'+x.m:''})();if(sk!==SESK){SESK=sk;if(EX){EX=null;if(AUD)AUD.pause();if(PISTA){PISTA.el.pause();PISTA=null}}VIEW='inicio';VARG='';F={}}ROOT=el;el.innerHTML=`<div class="alc-tabs" id="alcnav"></div><div id="alcv" class="alc-v"><section class="card"><p class="mini">Cargando…</p></section></div>`;V=el.querySelector('#alcv');
  el.querySelector('#alcnav').onclick=ev=>{const b=ev.target.closest('button[data-v]');if(b)go(b.dataset.v)};cargar().then(()=>{if(ROOT===el)render()})}
 function agregarRes(l){const all=RES(),k=r=>(r.m||'')+'|'+r.fecha,s=new Set(all.map(k));let n=0;(l||[]).forEach(r=>{if(!r||!r.fecha||s.has(k(r)))return;s.add(k(r));all.push(r);n++});if(n){all.sort((x,y)=>String(x.fecha).localeCompare(String(y.fecha)));setRES(all)}return n}
-return {mount,VER,go,agregarRes,importarMaterial,recargar,tieneMaterial:()=>!!BANK,estado:()=>({bank:!!BANK,formas:FORMAS.length,view:VIEW,examen:!!EX}),conteoALCPT:()=>{const p=pubALCPT();return {app:p.length,appL:p.filter(i=>i.sec==='L').length,appR:p.filter(i=>i.sec==='R').length,dispositivo:BANK&&BANK.alcpt?BANK.alcpt.length:0}}};
+return {mount,VER,go,agregarRes,importarMaterial,recargar,tieneMaterial:()=>!!BANK,estado:()=>({bank:!!BANK,formas:FORMAS.length,view:VIEW,examen:!!EX}),conteoALC:()=>({alc:nAlc()}),conteoALCPT:()=>{const p=pubALCPT();return {app:p.length,appL:p.filter(i=>i.sec==='L').length,appR:p.filter(i=>i.sec==='R').length,dispositivo:BANK&&BANK.alcpt?BANK.alcpt.length:0}}};
 }
 window.ALCMOD=crear('alc');window.ALCPTMOD=crear('alcpt');
 })();
