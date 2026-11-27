@@ -1,44 +1,86 @@
-/* Módulo ALC · ALCPT (v2.4) — usa los colores y tipografía de Misión Barra I; todo bajo #alcmod */
-#alcmod .alc-tabs{display:flex;overflow-x:auto;gap:6px;margin:0 0 12px;padding:2px 0 6px;scrollbar-width:none}
-#alcmod .alc-tabs button{border:1.5px solid var(--ln);background:var(--card);border-radius:999px;padding:7px 13px;white-space:nowrap;cursor:pointer;font-weight:600;color:var(--mu)}
-#alcmod .alc-tabs .on{background:var(--v);border-color:var(--v);color:#fff}
-#alcmod h1{font-size:18px;margin:0 0 6px}#alcmod h2{font-size:16px;margin:12px 0 6px}#alcmod h3{margin:10px 0 6px}
-#alcmod .muted{color:var(--mu);font-size:13.5px}
-#alcmod label.f{margin:10px 0 2px}
-#alcmod .btn{margin:4px 6px 4px 0}#alcmod .btn.peligro{background:var(--bad)}
-#alcmod .row>div{flex:1 1 140px}
-#alcmod .big:not(.btn){font-size:30px;font-weight:800;color:var(--v2)}#alcmod .big.okt{color:var(--ok)}#alcmod .big.badt{color:var(--bad)}
-#alcmod .okt{font-weight:700}#alcmod .badt{font-weight:700}
-#alcmod .hud{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;font-weight:700;color:var(--mu)}
-#alcmod .pbar{height:8px;background:var(--ln);border-radius:99px;overflow:hidden;margin:6px 0 10px}#alcmod .pbar i{display:block;height:100%;background:var(--v2)}
-#alcmod .tag{margin:2px}
-#alcmod .txt{background:var(--bg);border-radius:12px;padding:12px;white-space:pre-line;line-height:1.5;margin:8px 0}
-#alcmod .q{font-weight:600;white-space:pre-line}
-#alcmod .op{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border:1.5px solid var(--ln);background:var(--card);border-radius:14px;padding:12px 14px;margin:7px 0;cursor:pointer;font-size:15px}
-#alcmod .op b{flex:none;width:1.6em}#alcmod .op.sel{border-color:var(--v2);background:rgba(46,107,84,.08)}#alcmod .op.ok{border-color:var(--ok);background:rgba(29,138,78,.12)}#alcmod .op.no{border-color:var(--bad);background:rgba(192,57,43,.1)}
-#alcmod .fb{border-radius:12px;padding:10px 12px;margin-top:8px}#alcmod .fb.ok{background:rgba(29,138,78,.12)}#alcmod .fb.no{background:rgba(192,57,43,.1)}
-#alcmod .seg button{flex:1 1 auto}
-#alcmod td{white-space:normal}
-#alcmod code{background:var(--bg);padding:1px 4px;border-radius:5px}
-#alcmod .pdfbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0}
-#alcmod .pdfv{max-height:72vh;overflow:auto;background:var(--bg);border:1px solid var(--ln);border-radius:12px;padding:2px;-webkit-overflow-scrolling:touch}
-#alcmod .pdfv canvas{display:block;margin:0 auto 6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15)}
-#alcmod .pdfd summary{cursor:pointer;padding:6px 0}
-#alcmod .hoja{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 14px;margin:8px 0}
-#alcmod .hsec{grid-column:1/-1;font-weight:700;color:var(--v2);margin-top:8px}
-#alcmod .hr{display:flex;align-items:center;gap:5px;padding:3px 0;border-bottom:1px solid var(--ln)}
-#alcmod .hr>b{width:2.4em;text-align:right;margin-right:4px}
-#alcmod .hr button{width:38px;height:38px;border-radius:50%;border:1.5px solid var(--ln);background:var(--card);font-weight:700;cursor:pointer;padding:0}
-#alcmod .hr button.sel{background:var(--v);color:#fff;border-color:var(--v)}#alcmod .hr button.ok{background:var(--ok);color:#fff;border-color:var(--ok)}#alcmod .hr button.no{background:var(--bad);color:#fff;border-color:var(--bad)}
-#alcmod .hr button.pa{border-radius:10px;width:34px;background:var(--bg);color:var(--v2)}
-@media print{.tabbar,.tabs,header,#alcmod .alc-tabs,#alcmod .noprint{display:none!important}}
+/* Módulo ALC · ALCPT (v2.4) — usa los colores y tipografía de Misión Barra I; todo bajo #alcmod (v2.16: también #alcptmod) */
+#alcmod .alc-tabs,/* Módulo ALC · ALCPT (v2.4) — usa los colores y tipografía de Misión Barra I; todo bajo #alcptmod */
+#alcptmod .alc-tabs{display:flex;overflow-x:auto;gap:6px;margin:0 0 12px;padding:2px 0 6px;scrollbar-width:none}
+#alcmod .alc-tabs button,
+#alcptmod .alc-tabs button{border:1.5px solid var(--ln);background:var(--card);border-radius:999px;padding:7px 13px;white-space:nowrap;cursor:pointer;font-weight:600;color:var(--mu)}
+#alcmod .alc-tabs .on,
+#alcptmod .alc-tabs .on{background:var(--v);border-color:var(--v);color:#fff}
+#alcmod h1,
+#alcptmod h1{font-size:18px;margin:0 0 6px}#alcmod h2,#alcptmod h2{font-size:16px;margin:12px 0 6px}#alcmod h3,#alcptmod h3{margin:10px 0 6px}
+#alcmod .muted,
+#alcptmod .muted{color:var(--mu);font-size:13.5px}
+#alcmod label.f,
+#alcptmod label.f{margin:10px 0 2px}
+#alcmod .btn,
+#alcptmod .btn{margin:4px 6px 4px 0}#alcmod .btn.peligro,#alcptmod .btn.peligro{background:var(--bad)}
+#alcmod .row>div,
+#alcptmod .row>div{flex:1 1 140px}
+#alcmod .big:not(.btn),
+#alcptmod .big:not(.btn){font-size:30px;font-weight:800;color:var(--v2)}#alcmod .big.okt,#alcptmod .big.okt{color:var(--ok)}#alcmod .big.badt,#alcptmod .big.badt{color:var(--bad)}
+#alcmod .okt,
+#alcptmod .okt{font-weight:700}#alcmod .badt,#alcptmod .badt{font-weight:700}
+#alcmod .hud,
+#alcptmod .hud{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;font-weight:700;color:var(--mu)}
+#alcmod .pbar,
+#alcptmod .pbar{height:8px;background:var(--ln);border-radius:99px;overflow:hidden;margin:6px 0 10px}#alcmod .pbar i,#alcptmod .pbar i{display:block;height:100%;background:var(--v2)}
+#alcmod .tag,
+#alcptmod .tag{margin:2px}
+#alcmod .txt,
+#alcptmod .txt{background:var(--bg);border-radius:12px;padding:12px;white-space:pre-line;line-height:1.5;margin:8px 0}
+#alcmod .q,
+#alcptmod .q{font-weight:600;white-space:pre-line}
+#alcmod .op,
+#alcptmod .op{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border:1.5px solid var(--ln);background:var(--card);border-radius:14px;padding:12px 14px;margin:7px 0;cursor:pointer;font-size:15px}
+#alcmod .op b,
+#alcptmod .op b{flex:none;width:1.6em}#alcmod .op.sel,#alcptmod .op.sel{border-color:var(--v2);background:rgba(46,107,84,.08)}#alcmod .op.ok,#alcptmod .op.ok{border-color:var(--ok);background:rgba(29,138,78,.12)}#alcmod .op.no,#alcptmod .op.no{border-color:var(--bad);background:rgba(192,57,43,.1)}
+#alcmod .fb,
+#alcptmod .fb{border-radius:12px;padding:10px 12px;margin-top:8px}#alcmod .fb.ok,#alcptmod .fb.ok{background:rgba(29,138,78,.12)}#alcmod .fb.no,#alcptmod .fb.no{background:rgba(192,57,43,.1)}
+#alcmod .seg button,
+#alcptmod .seg button{flex:1 1 auto}
+#alcmod td,
+#alcptmod td{white-space:normal}
+#alcmod code,
+#alcptmod code{background:var(--bg);padding:1px 4px;border-radius:5px}
+#alcmod .pdfbar,
+#alcptmod .pdfbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0}
+#alcmod .pdfv,
+#alcptmod .pdfv{max-height:72vh;overflow:auto;background:var(--bg);border:1px solid var(--ln);border-radius:12px;padding:2px;-webkit-overflow-scrolling:touch}
+#alcmod .pdfv canvas,
+#alcptmod .pdfv canvas{display:block;margin:0 auto 6px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+#alcmod .pdfd summary,
+#alcptmod .pdfd summary{cursor:pointer;padding:6px 0}
+#alcmod .hoja,
+#alcptmod .hoja{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 14px;margin:8px 0}
+#alcmod .hsec,
+#alcptmod .hsec{grid-column:1/-1;font-weight:700;color:var(--v2);margin-top:8px}
+#alcmod .hr,
+#alcptmod .hr{display:flex;align-items:center;gap:5px;padding:3px 0;border-bottom:1px solid var(--ln)}
+#alcmod .hr>b,
+#alcptmod .hr>b{width:2.4em;text-align:right;margin-right:4px}
+#alcmod .hr button,
+#alcptmod .hr button{width:38px;height:38px;border-radius:50%;border:1.5px solid var(--ln);background:var(--card);font-weight:700;cursor:pointer;padding:0}
+#alcmod .hr button.sel,
+#alcptmod .hr button.sel{background:var(--v);color:#fff;border-color:var(--v)}#alcmod .hr button.ok,#alcptmod .hr button.ok{background:var(--ok);color:#fff;border-color:var(--ok)}#alcmod .hr button.no,#alcptmod .hr button.no{background:var(--bad);color:#fff;border-color:var(--bad)}
+#alcmod .hr button.pa,
+#alcptmod .hr button.pa{border-radius:10px;width:34px;background:var(--bg);color:var(--v2)}
+@media print{.tabbar,.tabs,header,#alcmod .alc-tabs,#alcptmod .alc-tabs,#alcmod .noprint,#alcptmod .noprint{display:none!important}}
 /* v2.5 · diseño dinámico */
-#alcmod .alc-tabs .on{background:linear-gradient(135deg,#6366f1,#a855f7 55%,#ec4899);border-color:transparent;box-shadow:0 6px 16px -8px #a855f7}
-#alcmod .alc-tabs button{transition:background .25s,color .25s}
-#alcmod .alc-v>*{animation:sube .35s cubic-bezier(.2,.8,.2,1) both}
-#alcmod .pbar i{background:linear-gradient(135deg,#6366f1,#a855f7 55%,#ec4899);transition:width .45s}
-#alcmod .op{transition:transform .15s,border-color .2s,background .2s}#alcmod .op:active{transform:scale(.98)}
-#alcmod .op.sel{background:rgba(99,102,241,.1)}#alcmod .op.ok.sel{animation:pop .45s}#alcmod .op.no{animation:tiembla .35s}
-#alcmod .big:not(.btn){background:linear-gradient(135deg,#6366f1,#a855f7 55%,#ec4899);-webkit-background-clip:text;background-clip:text;color:transparent}
-#alcmod .big.okt:not(.btn){background:linear-gradient(135deg,#10b981,#06b6d4);-webkit-background-clip:text;background-clip:text}#alcmod .big.badt:not(.btn){background:linear-gradient(135deg,#f43f5e,#f97316);-webkit-background-clip:text;background-clip:text}
-#alcmod .hr button{transition:transform .15s}#alcmod .hr button:active{transform:scale(.88)}#alcmod .hr button.sel{background:linear-gradient(135deg,#6366f1,#a855f7);border-color:transparent}
+#alcmod .alc-tabs .on,
+/* v2.5 · diseño dinámico */
+#alcptmod .alc-tabs .on{background:linear-gradient(135deg,#6366f1,#a855f7 55%,#ec4899);border-color:transparent;box-shadow:0 6px 16px -8px #a855f7}
+#alcmod .alc-tabs button,
+#alcptmod .alc-tabs button{transition:background .25s,color .25s}
+#alcmod .alc-v>*,
+#alcptmod .alc-v>*{animation:sube .35s cubic-bezier(.2,.8,.2,1) both}
+#alcmod .pbar i,
+#alcptmod .pbar i{background:linear-gradient(135deg,#6366f1,#a855f7 55%,#ec4899);transition:width .45s}
+#alcmod .op,
+#alcptmod .op{transition:transform .15s,border-color .2s,background .2s}#alcmod .op:active,#alcptmod .op:active{transform:scale(.98)}
+#alcmod .op.sel,
+#alcptmod .op.sel{background:rgba(99,102,241,.1)}#alcmod .op.ok.sel,#alcptmod .op.ok.sel{animation:pop .45s}#alcmod .op.no,#alcptmod .op.no{animation:tiembla .35s}
+#alcmod .big:not(.btn),
+#alcptmod .big:not(.btn){background:linear-gradient(135deg,#6366f1,#a855f7 55%,#ec4899);-webkit-background-clip:text;background-clip:text;color:transparent}
+#alcmod .big.okt:not(.btn),
+#alcptmod .big.okt:not(.btn){background:linear-gradient(135deg,#10b981,#06b6d4);-webkit-background-clip:text;background-clip:text}#alcmod .big.badt:not(.btn),#alcptmod .big.badt:not(.btn){background:linear-gradient(135deg,#f43f5e,#f97316);-webkit-background-clip:text;background-clip:text}
+#alcmod .hr button,
+#alcptmod .hr button{transition:transform .15s}#alcmod .hr button:active,#alcptmod .hr button:active{transform:scale(.88)}#alcmod .hr button.sel,#alcptmod .hr button.sel{background:linear-gradient(135deg,#6366f1,#a855f7);border-color:transparent}

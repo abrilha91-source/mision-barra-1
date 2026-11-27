@@ -187,3 +187,12 @@ th{color:var(--v)}[data-tema=oscuro] th{color:var(--v2)}
 #sombraOficialCard .sombra-sen td{background:var(--bg)}
 .sombra-ses{margin-top:12px}
 .sombra-ses .chk{margin-right:8px}
+/* v2.16: 8 pestañas (ALCPT) */
+.tabbar.t8 button{font-size:9.5px;padding:8px 0 9px;letter-spacing:-.2px}.tabbar.t8 i{font-size:17px}
+/* v2.16: importador de bancos y archivos */
+#impprev,#impver{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.45);overflow:auto;padding:16px 10px}
+#impprev .impbox,#impver .impbox{max-width:820px;margin:16px auto}
+#impprev .row.sp,#impver .row.sp{justify-content:space-between;align-items:center}
+#impprev .impk{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:8px 0}
+#impprev table td,#impprev table th{vertical-align:top}
+.impmed{margin:8px 0}.impmed img,.impmed video{max-width:100%;max-height:50vh;border-radius:10px}

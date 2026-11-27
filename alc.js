@@ -2,6 +2,7 @@
    Vista: solo Práctica y Simulacro. El material se conserva en el dispositivo (IndexedDB «mb1_alc») y sigue usándose; no se muestran formas, bancos ni evaluaciones formales.
    Nada se publica. No modifica los datos de la app (mb1_estado_v2). */
 (function(){'use strict';
+function crear(MODO){const PT=MODO==='alcpt';/* v2.16: misma vista para ALC y para ALCPT (dos instancias) */
 /* Práctica y simulacro ALC · v2.8 · Esc. Mil. Enfría.
    La app se publica VACÍA. El material de práctica se carga en cada dispositivo (IndexedDB) desde Administración › Ajustes. */
 const VER='1.0';
@@ -25,7 +26,8 @@ const ADM=()=>{const s=SES();return !!(s&&s.perfil==='admin')}; const SOLO_LEC=(
 const PIL=()=>{try{return typeof esPiloto==='function'&&esPiloto()}catch(e){return false}};
 const nomDef=()=>{const s=SES();return s&&s.perfil!=='admin'&&s.perfil!=='directora'?s.nombre:(localStorage.getItem('mb1_alc_nom')||'')};
 const matDef=()=>{const s=SES();return s&&s.perfil!=='admin'&&s.perfil!=='directora'?s.m:''};
-const RES=()=>LS('mb1_alc_res',[]),setRES=a=>SS('mb1_alc_res',a);
+const RKEY=PT?'mb1_alcpt_res':'mb1_alc_res',UKEY=PT?'mb1_alcpt_ultimo':'mb1_alc_ultimo';
+const RES=()=>LS(RKEY,[]),setRES=a=>SS(RKEY,a);
 /* ---------- esquemas ---------- */
 const ESQ_DEF={programa:{nombre:'2 libros por semestre',parciales:2,pond:{examen:.6,portafolio:.3,participacion:.1,parciales:.6,final:.4,minima:6},final:'ALCPT',cursos:[]}};
 const esqId=()=>{const e=LS('mb1_alc_esq',null);return BANK&&BANK.esquemas&&BANK.esquemas[e]?e:(BANK&&BANK.esquema_def)||'programa'};
@@ -40,9 +42,9 @@ const TABS=[['inicio','Inicio'],['practica','Práctica'],['simulacro','Simulacro
 function go(v){const [a,b]=String(v||'inicio').replace(/^#/,'').split('/');VIEW=a||'inicio';VARG=b||'';render()}
 function nav(){const n=ROOT&&ROOT.querySelector('#alcnav');if(n)n.innerHTML=TABS.map(([k,t])=>`<button type="button" data-v="${k}" class="${VIEW===k?'on':''}">${t}</button>`).join('')}
 function links(){if(!V)return;V.querySelectorAll('a[href^="#"]').forEach(a=>a.onclick=ev=>{ev.preventDefault();go(a.getAttribute('href'))})}
-function render(){if(!V||!document.body.contains(V))return;nav();const h=VIEW;
+function render(){if(!V||!document.body.contains(V))return;nav();let h=VIEW;
  if(EX&&h!=='examen'){if(!confirm('¿Salir del examen en curso? Se perderá.')){VIEW='examen';nav();return}EX=null;if(AUD)AUD.pause();if(PISTA){PISTA.el.pause();PISTA=null}speechSynthesis&&speechSynthesis.cancel()}
- if(['alc','alcpt','final','calif','banco'].includes(h)){VIEW=h==='alc'||h==='alcpt'?'practica':'inicio';nav();h=VIEW}({inicio:vInicio,practica:vPractica,simulacro:vSimulacro,alcpt:vPractica,alc:vPractica,resultados:vRes,examen:vExamen}[h]||vInicio)();links();const top=ROOT.getBoundingClientRect().top+scrollY-70;if(scrollY>top)window.scrollTo(0,Math.max(0,top))}
+ if(['alc','alcpt','final','calif','banco'].includes(h)){VIEW=h==='alc'||h==='alcpt'?'practica':'inicio';nav();h=VIEW}(PT?{inicio:ptInicio,practica:ptPractica,simulacro:ptSimulacro,resultados:vRes,examen:vExamen}[h]||ptInicio:{inicio:vInicio,practica:vPractica,simulacro:vSimulacro,alcpt:vPractica,alc:vPractica,resultados:vRes,examen:vExamen}[h]||vInicio)();links();const top=ROOT.getBoundingClientRect().top+scrollY-70;if(scrollY>top)window.scrollTo(0,Math.max(0,top))}
 const sinBanco=()=>{const adm=ADM()&&!SOLO_LEC();return `<div class="card"><h1>Material de práctica</h1><p class="muted">${adm?'Esta sección se publica vacía. Carga aquí el archivo que entrega la Mesa de Inglés. Se guarda solo en este dispositivo.':'El material de práctica aún no está en este dispositivo. Pídele a tu docente que lo cargue.'}</p>${adm?`<label class="btn big">Cargar material (.json)<input type="file" class="imp" accept=".json,application/json" hidden></label>`:''}</div>`};
 function bindImp(){document.querySelectorAll('input.imp').forEach(i=>i.onchange=importar)}
 function importar(e){const f=e&&e.target&&e.target.files?e.target.files[0]:e;if(!f||!f.name)return;return importarMaterial(f)}
@@ -50,7 +52,7 @@ function importarMaterial(f){if(SOLO_LEC()||!ADM()){toast('Solo Administración 
  return new Promise((ok,ko)=>{const r=new FileReader();r.onerror=()=>ko(r.error);r.onload=async()=>{let b;
   try{b=JSON.parse(String(r.result).replace(/^\uFEFF/,''))}catch(x){alert('El archivo no es JSON válido.');ok(false);return}
   if(!b||b.tipo!=='banco_alcpt_alc'||!Array.isArray(b.alcpt)||!Array.isArray(b.alc)){alert('Este archivo no es el material de práctica de la Mesa de Inglés.');ok(false);return}
-  BANK=b;try{await idbSet('bank',b)}catch(x){alert('No se pudo guardar en el dispositivo: '+x.message);ok(false);return}
+  BASE=b;mezclar();try{await idbSet('bank',b)}catch(x){alert('No se pudo guardar en el dispositivo: '+x.message);ok(false);return}
   toast('Material de práctica listo en este dispositivo.');if(V&&document.body.contains(V))render();ok(true)};r.readAsText(f)})}
 /* ---------- utilidades ---------- */
 function shuffle(a,seed){a=a.slice();let x=seed||Math.random()*1e9|0;const rnd=()=>{x=(x*1103515245+12345)&0x7fffffff;return x/0x7fffffff};for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
@@ -105,6 +107,48 @@ function vSimulacro(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}
  <label class="f">Nombre (opcional, para tu registro)</label><input type="text" id="nom" value="${esc(nomDef())}">
  <button class="btn big" id="go">Iniciar simulacro</button></div>`;
  $('#go').onclick=()=>iniciarLibre('simulacro')}
+/* ---------- v2.16 · sección ALCPT ----------
+   Banco de la app: reactivos ORIGINALES con la estructura del ALCPT (bank.js, bank2.js, bank3.js; públicos, no oficiales).
+   Material de la Mesa: si Administración lo cargó en este dispositivo (IndexedDB «mb1_alc»), también se usan sus reactivos ALCPT. Nada privado vive en el código. */
+const TEMAS_PT={lir:'Listening: respuestas',lic:'Listening: comprensión',tie:'Gramática: tiempos verbales',est:'Gramática: estructura',voc:'Vocabulario',lec:'Lectura'};
+let PUB=null;
+function pubALCPT(){if(PUB)return PUB;let B=[];try{B=(typeof BANCO!=='undefined'&&Array.isArray(BANCO))?BANCO:[]}catch(e){B=[]}
+ const ak=t=>{try{return typeof akey==='function'?akey(t):''}catch(e){return ''}};
+ PUB=B.filter(b=>TEMAS_PT[b.t]&&b.o&&b.o.length>=2).map(b=>{const lis=b.t==='lir'||b.t==='lic';const ord=shuffle(b.o.map((o,j)=>j),(Math.abs(hashS(b.id))%2147483646)+1);
+  const k=lis?ak(b.au):'';return {id:'APP-'+b.id,sec:lis?'L':'R',tema:b.t,tipo:TEMAS_PT[b.t],s:lis?b.au:'',q:b.t==='lir'?'Choose the best response.':(b.q||''),pas:b.pas||'',o:ord.map(j=>b.o[j]),k:ord.indexOf(0),e:!lis&&String(b.q).includes('___')?'Oración completa: '+String(b.q).replace('___',b.o[0]):'',mp3:lis&&k&&window.AUDIOS&&window.AUDIOS[k]?'audio/'+k+'.mp3':'',origen:'app'}});return PUB}
+function hashS(s){let h=0;s=String(s);for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return h}
+const temaDev=it=>{if(TEMAS_PT[it.tema])return it.tema;const t=String(it.tipo||'');if(it.sec==='L')return /escucha|enunciado|pregunta|di[aá]logo/i.test(t)?'lic':'lic';if(/vocab/i.test(t))return 'voc';if(/gram/i.test(t))return 'est';if(/lect|aviso|noticia/i.test(t))return 'lec';return 'est'};
+function devALCPT(){return (BANK&&Array.isArray(BANK.alcpt)?BANK.alcpt:[]).filter(i=>i&&Array.isArray(i.o)&&i.k!=null).map(i=>Object.assign({},i,{tema:temaDev(i),origen:'dev'}))}
+function poolPT(fu,tema,sec){let p=fu==='dev'?devALCPT():fu==='app'?pubALCPT():pubALCPT().concat(devALCPT());if(tema)p=p.filter(i=>tema==='lis'?i.sec==='L':tema==='gra'?(i.tema==='tie'||i.tema==='est'):i.tema===tema);if(sec)p=p.filter(i=>i.sec===sec);return p}
+function armarPT(n,fu,tema,sec,simul){const p=poolPT(fu,tema,sec);if(!p.length)return [];const Lp=shuffle(p.filter(i=>i.sec==='L')),Rp=shuffle(p.filter(i=>i.sec==='R'));n=Math.min(+n||p.length,p.length);
+ let nl=sec==='L'?n:sec==='R'?0:simul||!tema?Math.min(Lp.length,Math.round(n/2)):Math.round(n*Lp.length/p.length);if(n-nl>Rp.length)nl=n-Rp.length;return Lp.slice(0,nl).concat(Rp.slice(0,n-nl))}
+const fuSel=()=>{const dev=!!(BANK&&BANK.alcpt&&BANK.alcpt.length);return `<label class="f">Banco</label><select id="fu"><option value="app">Banco de la app (${pubALCPT().length})</option>${dev?`<option value="dev">Material cargado en este dispositivo (${devALCPT().length})</option><option value="todo" selected>Ambos (${pubALCPT().length+devALCPT().length})</option>`:''}</select>`};
+function iniciarPT(modo){const fu=($('#fu')&&$('#fu').value)||'app',tema=($('#tema')&&$('#tema').value)||'',sec=($('#sec')&&$('#sec').value)||'';
+ const n=modo==='practica'?(+($('#n')&&$('#n').value)||20):(+($('#nsim')&&$('#nsim').value)||100);const its=armarPT(n,fu,modo==='practica'?tema:'',sec,modo!=='practica');
+ if(!its.length){toast('No hay reactivos con esos filtros.');return}const nom=(($('#nom')&&$('#nom').value.trim())||nomDef());
+ EX={fuente:'alcpt',c:{alcance:'libre',banco:fu},modo:modo==='practica'?'practica':'simulacro',nom,its,i:0,r:its.map(()=>null),plays:its.map(()=>0),ini:Date.now()};go('examen')}
+function tocarMp3(src,txt){if(/^idb:/.test(src)){if(!window.IMPORTA){hablar(txt);return}IMPORTA.url(src).then(u=>{if(u)tocarMp3(u,txt);else if(txt)hablar(txt);else toast('No se encontró el audio en este dispositivo.')});return}try{if(AUD){AUD.pause()}}catch(e){}if(window.MB1AUD){MB1AUD.cancelar&&MB1AUD.cancelar();MB1AUD.playFile(src,{rate:MB1AUD.rateGuardada(.9)<.85?.72:1,onFail:()=>hablar(txt)}).then(el=>{AUD=el}).catch(()=>hablar(txt));return}AUD=new Audio(src);AUD.play().catch(()=>hablar(txt))}
+function ptInicio(){const mm=matDef(),r=RES().filter(x=>ADM()||!mm||x.m===mm).slice(-5).reverse(),p=pubALCPT(),dv=devALCPT();
+ V.innerHTML=`<div class="card"><h1>ALCPT</h1><p class="muted">Practica con el formato del ALCPT: Parte I, comprensión auditiva (respuestas y comprensión), y Parte II, lectura y estructura (gramática, vocabulario y lectura). Es práctica: no es un resultado oficial.</p>
+ <div class="row"><a class="btn big" href="#practica">Práctica</a><a class="btn big" href="#simulacro">Simulacro</a></div>
+ <p class="mini">Banco de la app: ${p.length} reactivos originales tipo ALCPT (${p.filter(i=>i.sec==='L').length} de comprensión auditiva y ${p.filter(i=>i.sec==='R').length} de lectura y estructura).${dv.length?` Material cargado en este dispositivo (Mesa o importado en Administración): ${dv.length} reactivos.`:''} No son reactivos oficiales del examen.</p></div>
+ <div id="ptrec"></div><div class="card"><h2>También para el ALCPT</h2><p class="muted">Refuerza con las otras secciones de la app.</p><div class="row"><button class="btn ghost" type="button" data-tab="vocab">Flash cards de vocabulario</button><button class="btn ghost" type="button" data-tab="escucha">Listening Lab y Completa la palabra</button></div></div>
+ <div class="card" id="audio-cfg"><h2>Audio</h2><p class="muted">Si el reactivo tiene grabación, se usa esa. Si se lee con la voz del dispositivo, elige la voz aquí. En simulacro cada audio se escucha hasta 2 veces.</p>
+ <label class="f">Voz en inglés</label><select id="vozsel">${window.MB1AUD?MB1AUD.opcionesVoz():'<option value="">Voz del dispositivo</option>'}</select>
+ <label class="f">Velocidad</label><select id="ratesel">${[[.8,'Lenta'],[.9,'Normal'],[1,'Rápida']].map(([v,l])=>`<option value="${v}" ${window.MB1AUD&&MB1AUD.rateGuardada(.9)===v?'selected':''}>${l}</option>`).join('')}</select>
+ <button class="btn ghost" type="button" id="probarvoz">Probar voz</button></div>
+ <div class="card"><h2>Últimos resultados ALCPT</h2>${r.length?tablaRes(r):'<p class="muted">Aún no hay resultados en este dispositivo.</p>'}</div>`;
+ V.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{try{tab=b.dataset.tab;window.render&&window.render()}catch(e){}});if(window.IMPORTA)IMPORTA.recursosCadete(V.querySelector('#ptrec'));if(window.MB1AUD)MB1AUD.bindAudioUI(V)}
+function ptPractica(){V.innerHTML=`<div class="card"><h1>Práctica ALCPT</h1><p class="muted">Respondes y ves de inmediato si acertaste. Elige una parte del examen o practica todo.</p>
+ ${fuSel()}<div class="row"><div><label class="f">Parte</label><select id="tema"><option value="">Todo (mitad auditiva, mitad lectura)</option><option value="lis">Comprensión auditiva (todas)</option><option value="lir">Listening: respuestas</option><option value="lic">Listening: comprensión</option><option value="gra">Gramática</option><option value="voc">Vocabulario</option><option value="lec">Lectura</option></select></div>
+ <div><label class="f">Número de preguntas</label><input type="number" id="n" min="5" max="50" value="20"></div></div>
+ <label class="f">Nombre (opcional, para tu registro)</label><input type="text" id="nom" value="${esc(nomDef())}">
+ <button class="btn big" id="go">Comenzar práctica</button></div>`;$('#go').onclick=()=>iniciarPT('practica')}
+function ptSimulacro(){V.innerHTML=`<div class="card"><h1>Simulacro ALCPT</h1><p class="muted">Como el examen: Parte I, comprensión auditiva, y Parte II, lectura y estructura, con revisión al final. Cada audio se escucha hasta 2 veces. Es práctica: no es un resultado oficial.</p>
+ ${fuSel()}<div class="row"><div><label class="f">Sección</label><select id="sec"><option value="">Completo (Parte I y Parte II)</option><option value="L">Solo comprensión auditiva</option><option value="R">Solo lectura y estructura</option></select></div>
+ <div><label class="f">Preguntas</label><select id="nsim"><option value="100">100 (completo, ~70 min)</option><option value="50">50 (medio, ~35 min)</option><option value="20">20 (corto, ~15 min)</option></select></div></div>
+ <label class="f">Nombre (opcional, para tu registro)</label><input type="text" id="nom" value="${esc(nomDef())}">
+ <button class="btn big" id="go">Iniciar simulacro</button></div>`;$('#go').onclick=()=>iniciarPT('simulacro')}
 /* ---------- selección ALC / ALCPT ---------- */
 let F={};
 function filtros(fuente){return F[fuente]||(F[fuente]={fuente,alcance:'parcial',curso:cursos()[0].id,par:'1',libro:'',lec:'',comp:true,forma:'A',sec:'',tipo:'',n:fuente==='alc'?'30':'50',modo:'examen',acum:false})}
@@ -278,21 +322,22 @@ let EX=null,PISTA=null,AUD=null;
 async function tocar(fid,n){if(AUD){try{AUD.pause();URL.revokeObjectURL(AUD.src)}catch(e){}}if(window.MB1AUD)MB1AUD.cancelar();const u=await audioURL(fid,n);if(!u){toast('No se encontró el audio');return}if(window.MB1AUD){try{AUD=await MB1AUD.playFile(u,{onFail:()=>toast('Toca de nuevo para reproducir')})}catch(e){toast('Toca de nuevo para reproducir')}return}AUD=new Audio(u);AUD.play().catch(()=>toast('Toca de nuevo para reproducir'))}
 function iniciar(fuente,f,nom){const its=armar(f);if(!its.length){alert('No hay reactivos con esos filtros.');return}
  const c=curso(f.curso);EX={fuente,c:{alcance:f.alcance,curso:f.curso,cursoNom:c.nombre,par:f.alcance==='parcial'?f.par:'',acum:f.acum,forma:f.alcance==='forma'?f.forma:'',libro:f.alcance==='libro'?f.libro:'',lec:f.lec,libros:librosEval(f)},modo:f.modo,nom,its,i:0,r:its.map(()=>null),plays:its.map(()=>0),ini:Date.now()};go('examen')}
-function evalTxt(e){return e.modo==='practica'?'Práctica':'Simulacro'}
+function evalTxt(e){return (e.modo==='practica'?'Práctica':'Simulacro')+(PT?' ALCPT':'')}
 function titulo(e){return evalTxt(e)}
 function vExamen(){if(!EX){go('inicio');return}if(EX.hoja){vHoja();return}const e=EX,it=e.its[e.i],ans=e.r[e.i],prac=e.modo==='practica',done=prac&&ans!==null&&it.k!=null;
- const parte=it.sec==='L'?'Parte I · Comprensión auditiva':'Parte II · Lectura y estructura';const ofi=it.sec==='L'&&!it.s&&!it.aud;
+ const parte=it.sec==='L'?'Parte I · Comprensión auditiva':'Parte II · Lectura y estructura';const ofi=it.sec==='L'&&!it.s&&!it.aud&&!it.mp3;
  V.innerHTML=`<div class="card"><div class="hud"><span>${titulo(e)}</span><span>${e.i+1} / ${e.its.length}</span></div><div class="pbar"><i style="width:${100*(e.i+1)/e.its.length}%"></i></div>
  <span class="tag">${parte}</span>
- ${e.fuente==='final'&&e.c.pista&&it.sec==='L'?`<div class="txt">🔊 <b>Pista completa</b> (el aplicador la controla)<audio controls preload="auto" id="pista" style="width:100%;margin-top:6px"></audio></div>`:''}${it.sec==='L'&&(it.s||it.aud)?`<div class="noprint"><button class="btn" id="play">▶ Escuchar${!prac?` (${2-e.plays[e.i]} restantes)`:''}</button></div>${done?`<div class="txt">${esc(it.s)}</div>`:''}`:ofi?`<div class="txt">🔊 <b>Audio:</b> escucha y elige la mejor respuesta.</div>`:it.s?`<div class="txt">${esc(it.s)}</div>`:''}
- ${it.q?`<div class="q">${esc(it.q)}</div>`:''}
+ ${e.fuente==='final'&&e.c.pista&&it.sec==='L'?`<div class="txt">🔊 <b>Pista completa</b> (el aplicador la controla)<audio controls preload="auto" id="pista" style="width:100%;margin-top:6px"></audio></div>`:''}${it.sec==='L'&&(it.s||it.aud||it.mp3)?`<div class="noprint"><button class="btn" id="play">▶ Escuchar${!prac?` (${2-e.plays[e.i]} restantes)`:''}</button></div>${done?`<div class="txt">${esc(it.s)}</div>`:''}`:ofi?`<div class="txt">🔊 <b>Audio:</b> escucha y elige la mejor respuesta.</div>`:it.s?`<div class="txt">${esc(it.s)}</div>`:''}
+ ${it.img?`<div class="impmed"><img data-ref="${esc(it.img)}" alt="Imagen de la pregunta"></div>`:''}${it.vid?`<div class="impmed"><video controls data-ref="${esc(it.vid)}"></video></div>`:''}${it.pas?`<div class="txt">${esc(it.pas)}</div>`:''}${it.q?`<div class="q">${esc(it.q)}</div>`:''}
  ${it.o.map((o,j)=>`<button class="op ${ans===j?'sel':''} ${done&&j===it.k?'ok':''} ${done&&ans===j&&j!==it.k?'no':''}" data-j="${j}" ${done?'disabled':''}><b>${L[j]})</b>${esc(o)}</button>`).join('')}
  ${done?`<div class="fb ${ans===it.k?'ok':'no'}"><b>${ans===it.k?'Correcto':'Incorrecto · respuesta: '+L[it.k]}</b><br>${esc(limpioE(it.e))}</div>`:''}
  <div class="row" style="margin-top:10px"><button class="btn ghost" id="prev" ${e.i?'':'disabled'}>Anterior</button>${e.i<e.its.length-1?`<button class="btn" id="next">Siguiente</button>`:`<button class="btn" id="fin">Terminar</button>`}</div>
  <p class="mini">Respondidas: ${e.r.filter(x=>x!==null).length} de ${e.its.length}. <a href="#" id="abort">Cancelar</a></p></div>`;
+ V.querySelectorAll('[data-ref]').forEach(m=>{if(window.IMPORTA)IMPORTA.url(m.dataset.ref).then(u=>{if(u)m.src=u})});
  V.querySelectorAll('.op').forEach(b=>b.onclick=()=>{e.r[e.i]=+b.dataset.j;vExamen();if(prac&&it.k!=null&&window.FX){if(e.r[e.i]===it.k)FX.ok(V.querySelector('.op.ok'));else FX.no()}});
  const ps=$('#pista');if(ps){if(PISTA&&PISTA.fid===e.c.fid){ps.replaceWith(PISTA.el);PISTA.el.id='pista'}else audioURL(e.c.fid,null).then(u=>{if(u){ps.src=u;PISTA={fid:e.c.fid,el:ps}}})}
- const p=$('#play');if(p)p.onclick=()=>{if(!prac&&e.plays[e.i]>=2){toast('Ya no quedan reproducciones');return}e.plays[e.i]++;if(it.aud)tocar(e.c.fid,it.n);else hablar(it.s);if(!prac)p.textContent=`▶ Escuchar (${2-e.plays[e.i]} restantes)`};
+ const p=$('#play');if(p)p.onclick=()=>{if(!prac&&e.plays[e.i]>=2){toast('Ya no quedan reproducciones');return}e.plays[e.i]++;if(it.aud)tocar(e.c.fid,it.n);else if(it.mp3)tocarMp3(it.mp3,it.s);else hablar(it.s);if(!prac)p.textContent=`▶ Escuchar (${2-e.plays[e.i]} restantes)`};
  $('#prev').onclick=()=>{e.i--;vExamen()};const n=$('#next');if(n)n.onclick=()=>{e.i++;vExamen()};
  const f=$('#fin');if(f)f.onclick=()=>{const pend=e.r.filter(x=>x===null).length;if(pend&&!confirm(`Faltan ${pend} sin responder (cuentan como error). ¿Terminar?`))return;calificar()};
  $('#abort').onclick=ev=>{ev.preventDefault();if(confirm('¿Cancelar?')){const mo=e.modo;EX=null;if(AUD)AUD.pause();if(PISTA)PISTA.el.pause();PISTA=null;speechSynthesis&&speechSynthesis.cancel();go(mo==='practica'?'practica':'simulacro')}}}
@@ -309,7 +354,7 @@ function calificar(){const e=EX,cfg=CFG();let ok=0;const por={};const its=e.its.
  <h3>Por sección</h3><p>${['L','R'].filter(s=>sec[s][1]).map(s=>`<span class="tag">${s==='L'?'Comprensión auditiva':'Lectura y estructura'}: ${sec[s][0]}/${sec[s][1]}</span>`).join('')}</p>
  <div class="row noprint"><button class="btn" onclick="print()">Imprimir</button><a class="btn ghost" href="#${e.modo==='practica'?'practica':'simulacro'}">Volver</a></div></div>
  ${!ADM()&&e.fuente==='final'&&e.modo==='examen'?'':`<div class="card"><h2>Revisión de errores</h2>${lst.map((it,j)=>it.k==null||r[j]===it.k?'':`<div style="border-bottom:1px solid var(--b);padding:8px 0"><b>${it.n?it.n:j+1}.</b> ${it.s?`<div class="txt">${esc(it.s)}</div>`:''}<div><b>${esc(it.q)}</b></div><div class="badt">Respuesta: ${r[j]===null?'(sin responder)':L[r[j]]+') '+esc(it.o[r[j]])}</div><div class="okt">Correcta: ${L[it.k]}) ${esc(it.o[it.k])}</div><div class="mini">${esc(limpioE(it.e))}</div></div>`).join('')||'<p>¡Sin errores!</p>'}</div>`}`;
- SS('mb1_alc_ultimo',res);if(window.FX&&cal>=cfg.minima)FX.fin(cal>=9?200:130)}
+ SS(UKEY,res);links();if(window.FX&&cal>=cfg.minima)FX.fin(cal>=9?200:130)}
 /* ---------- calificación ---------- */
 function vCalif(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}const cfg=CFG(),u=LS('mb1_alc_ultimo',null),d=LS('mb1_alc_calc_'+esqId(),{}),np=parN(),sup=esqId()==='superioridad';
  const conv=BANK.conversion||{};
@@ -334,7 +379,7 @@ function vCalif(){if(!BANK){V.innerHTML=sinBanco();bindImp();return}const cfg=CF
  V.querySelectorAll('input[id],select#tb').forEach(i=>i.oninput=i.onchange=calc);
  V.querySelectorAll('[data-cfg]').forEach(i=>i.onchange=()=>{const o=LS('mb1_alc_cfg_'+esqId(),{});o[i.dataset.cfg]=parseFloat(i.value);SS('mb1_alc_cfg_'+esqId(),o);vCalif()});calc()}
 /* ---------- resultados ---------- */
-function tipoRes(r){return r.modo==='practica'?'Práctica':'Simulacro'}
+function tipoRes(r){return (r.modo==='practica'?'Práctica':'Simulacro')+(PT?' ALCPT':'')}
 function tablaRes(a){return `<div class="tw"><table><tr><th>Fecha</th><th>Cadete</th><th>Tipo</th><th>Aciertos</th><th>%</th></tr>${a.map(r=>`<tr><td>${fechaL(r.fecha)}</td><td>${esc(r.nom||'—')}</td><td>${tipoRes(r)}</td><td>${r.ok}/${r.n}</td><td>${r.pct}</td></tr>`).join('')}</table></div>`}
 function vRes(){vRes0();if(!ADM())V.querySelectorAll('.adm').forEach(x=>x.remove())}
 function vRes0(){const mm=matDef(),a=RES().filter(r=>ADM()||r.m===mm).slice().reverse();
@@ -359,12 +404,17 @@ function vBanco0(){const cnt=(src,f)=>pool(Object.assign({fuente:src,sec:'',tipo
  `<div class="card"><h2>Final ALCPT</h2><p class="muted">${FORMAS.length?`${FORMAS.length} formas cargadas (${FORMAS.reduce((a,f)=>a+f.items.length,0)} reactivos).`:'Sin formas cargadas.'} Se cargan y administran en la pestaña «Final ALCPT».</p></div>
  <div class="card"><h2>Voz</h2><p class="muted">La comprensión auditiva usa la voz en inglés del dispositivo. En examen se puede escuchar cada audio 2 veces.</p><label class="f">Velocidad</label><select id="rate">${[[.8,'Lenta'],[.9,'Normal'],[1,'Rápida']].map(([v,t])=>`<option value="${v}" ${+(localStorage.getItem('mb1_alc_rate')||.9)===v?'selected':''}>${t}</option>`).join('')}</select><button class="btn ghost" id="prueba">Probar voz</button></div>
  <p class="mini">ALCPT y ALC por parciales v${VER} · Esc. Mil. Enfría. · No afiliada al DLIELC. El banco, las formas y los audios son confidenciales y no se publican.</p>`;
- bindImp();bindEsq(vBanco);const q=$('#qb');if(q)q.onclick=async()=>{if(confirm('¿Quitar el banco de este dispositivo? Tus resultados se conservan.')){await idbDel('bank');BANK=null;vBanco()}};
+ bindImp();bindEsq(vBanco);const q=$('#qb');if(q)q.onclick=async()=>{if(confirm('¿Quitar el banco de este dispositivo? Tus resultados se conservan.')){await idbDel('bank');BASE=null;mezclar();vBanco()}};
  $('#rate').onchange=e=>localStorage.setItem('mb1_alc_rate',e.target.value);$('#prueba').onclick=()=>hablar('M: Good morning, Cadet. Where is the clinic?\nW: It is next to the main gate, sir.')}
 /* ---------- arranque ---------- */
-let CARGA=null;function cargar(){if(CARGA)return CARGA;CARGA=(window.indexedDB?Promise.all([idbGet('bank'),idbGet('formas')]).then(([b,f])=>{if(b&&b.alcpt)BANK=b;if(Array.isArray(f))FORMAS=f}).catch(()=>{}):Promise.resolve());return CARGA}
-let SESK=null;function mount(el){const sk=(()=>{const x=SES();return x?x.perfil+'|'+x.m:''})();if(sk!==SESK){SESK=sk;if(EX){EX=null;if(AUD)AUD.pause();if(PISTA){PISTA.el.pause();PISTA=null}}VIEW='inicio';VARG='';F={}}ROOT=el;el.innerHTML=`<div class="alc-tabs" id="alcnav"></div><div id="alcv" class="alc-v"><section class="card"><p class="mini">Cargando…</p></section></div>`;V=el.querySelector('#alcv');
+/* v2.16: preguntas importadas en Administración (importar.js) se suman al material de la Mesa; se guardan aparte (clave «imp») */
+let BASE=null,IMP=null;function mezclar(){if(IMP&&(IMP.alcpt.length||IMP.alc.length)){const b=BASE||{tipo:'banco_alcpt_alc',version:'importado',fecha:'',alcpt:[],alc:[],semestres:[],importado:true};BANK=Object.assign({},b,{alcpt:(b.alcpt||[]).concat(IMP.alcpt),alc:(b.alc||[]).concat(IMP.alc),semestres:b.semestres||[]})}else BANK=BASE}
+let CARGA=null;function cargar(){if(CARGA)return CARGA;CARGA=(window.indexedDB?Promise.all([idbGet('bank'),idbGet('formas'),idbGet('imp')]).then(([b,f,im])=>{BASE=b&&b.alcpt?b:null;if(Array.isArray(f))FORMAS=f;IMP=im&&Array.isArray(im.alcpt)?im:null;mezclar()}).catch(()=>{}):Promise.resolve());return CARGA}
+function recargar(){CARGA=null;return cargar().then(()=>{if(V&&document.body.contains(V)&&!EX)render()})}
+let SESK=null;function mount(el){CARGA=null;const sk=(()=>{const x=SES();return x?x.perfil+'|'+x.m:''})();if(sk!==SESK){SESK=sk;if(EX){EX=null;if(AUD)AUD.pause();if(PISTA){PISTA.el.pause();PISTA=null}}VIEW='inicio';VARG='';F={}}ROOT=el;el.innerHTML=`<div class="alc-tabs" id="alcnav"></div><div id="alcv" class="alc-v"><section class="card"><p class="mini">Cargando…</p></section></div>`;V=el.querySelector('#alcv');
  el.querySelector('#alcnav').onclick=ev=>{const b=ev.target.closest('button[data-v]');if(b)go(b.dataset.v)};cargar().then(()=>{if(ROOT===el)render()})}
 function agregarRes(l){const all=RES(),k=r=>(r.m||'')+'|'+r.fecha,s=new Set(all.map(k));let n=0;(l||[]).forEach(r=>{if(!r||!r.fecha||s.has(k(r)))return;s.add(k(r));all.push(r);n++});if(n){all.sort((x,y)=>String(x.fecha).localeCompare(String(y.fecha)));setRES(all)}return n}
-window.ALCMOD={mount,VER,go,agregarRes,importarMaterial,tieneMaterial:()=>!!BANK,estado:()=>({bank:!!BANK,formas:FORMAS.length,view:VIEW,examen:!!EX})};
+return {mount,VER,go,agregarRes,importarMaterial,recargar,tieneMaterial:()=>!!BANK,estado:()=>({bank:!!BANK,formas:FORMAS.length,view:VIEW,examen:!!EX}),conteoALCPT:()=>{const p=pubALCPT();return {app:p.length,appL:p.filter(i=>i.sec==='L').length,appR:p.filter(i=>i.sec==='R').length,dispositivo:BANK&&BANK.alcpt?BANK.alcpt.length:0}}};
+}
+window.ALCMOD=crear('alc');window.ALCPTMOD=crear('alcpt');
 })();
